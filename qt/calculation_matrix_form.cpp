@@ -1,5 +1,6 @@
 #include "calculation_matrix_form.h"
 #include "ui_calculation_matrix_form.h"
+#include "download_files_form.h"
 
 calculation_matrix_form::calculation_matrix_form(QWidget *parent)
     : QMainWindow(parent)
@@ -28,22 +29,29 @@ void calculation_matrix_form::on_decomposite_button_clicked()
     loadingDialog->setAttribute(Qt::WA_DeleteOnClose); // Удаление виджета после закрытия
     loadingDialog->show();
 
+    download_files_form *download_files_form = new class download_files_form();
     // Запускаем длительную операцию в отдельном потоке
     QThread *thread = QThread::create([=]() {
         longRunningOperation(); // Вызов длительной операции
 
         // Закрытие окна загрузки после завершения операции
         QMetaObject::invokeMethod(loadingDialog, "close");
-        //TODO здесь показываем последнее окно
+        this->hide();
+
+
+
     });
 
     thread->start();
+
+    download_files_form->show();
+
 }
 
 // Функция "затычка"
 void calculation_matrix_form::longRunningOperation() {
     // Эмулируем длительную операцию
-    for (int i = 0; i <= 100; ++i) {
+    for (int i = 0; i <= 3; ++i) {
         QThread::sleep(1); // Заменить это на реальную операцию
     }
 }
@@ -73,7 +81,7 @@ void calculation_matrix_form::setup_ui()
 
     // Добавляем элементы к вертикальному компоновщику
     mainLayout->addWidget(add_file_label);
-    mainLayout->addWidget(file_path_line_edit); // Добавляем QLineEdit
+    mainLayout->addWidget(file_path_line_edit);
     mainLayout->addWidget(add_file_button);
     mainLayout->addWidget(your_matrix_label);
     mainLayout->addWidget(matrix_viewer);
@@ -96,7 +104,7 @@ void calculation_matrix_form::setup_ui()
     // Показываем окно
     this->show();
 
-    // Подключаем сигнал к слоту
+    // Подключаем сигналы к слоту
     connect(decomposite_button, &QPushButton::clicked, this, &calculation_matrix_form::on_decomposite_button_clicked);
     connect(add_file_button, &QPushButton::clicked, this, &calculation_matrix_form::on_add_file_button_clicked);
 

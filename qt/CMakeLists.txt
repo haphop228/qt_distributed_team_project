@@ -28,6 +28,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         calculation_matrix_form.h calculation_matrix_form.cpp calculation_matrix_form.ui
 
         loading.h loading.cpp
+        download_files_form.h download_files_form.cpp download_files_form.ui
 
 
     )

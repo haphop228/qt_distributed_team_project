@@ -29,6 +29,9 @@ public:
     explicit calculation_matrix_form(QWidget *parent = nullptr);
     ~calculation_matrix_form();
 
+signals:
+    void loadingFinished();
+
 private slots:
     void on_add_file_button_clicked();
     void on_decomposite_button_clicked();

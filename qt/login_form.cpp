@@ -1,6 +1,5 @@
 #include "login_form.h"
 #include "ui_login_form.h"
-#include "mainwindow.h"
 #include "calculation_matrix_form.h"
 #include "registration_form.h"
 #include <QMessageBox>
