@@ -54,7 +54,7 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: "/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_sqlite"  # Укажите путь на хосте для MongoDB
+      device: "/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_mongo"  # Укажите путь на хосте для MongoDB
       o: bind
   sqlite_data:
     driver: local

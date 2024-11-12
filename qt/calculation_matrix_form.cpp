@@ -16,6 +16,7 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
 }
 
 // Слот для добавления файла
+// Слот для добавления файла
 void calculation_matrix_form::on_add_file_button_clicked()
 {
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"), "",
@@ -23,6 +24,59 @@ void calculation_matrix_form::on_add_file_button_clicked()
     if (!fileName.isEmpty()) {
         // Записываем путь к файлу в текстовое поле
         file_path_line_edit->setText(fileName);
+
+        // Открываем файл
+        QFile file(fileName);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, tr("Error"), tr("Could not open file"));
+            return;
+        }
+
+        // Очистка предыдущего содержимого таблицы
+        matrix_viewer->clear();
+
+        // Считывание и анализ содержимого файла .mtx
+        QTextStream in(&file);
+        QStringList headers;
+        QList<QList<double>> matrixData;
+
+        // Пропускаем комментарии в файле .mtx
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            if (line.startsWith('%')) continue;
+
+            // Разделяем строку по пробелам и конвертируем элементы в числа
+            QStringList elements = line.split(' ', Qt::SkipEmptyParts);
+            QList<double> row;
+            for (const QString &element : elements) {
+                row.append(element.toDouble());
+            }
+            matrixData.append(row);
+        }
+
+        // Закрываем файл
+        file.close();
+
+        // Установка количества строк и столбцов в соответствии с матрицей
+        int rowCount = matrixData.size();
+        int columnCount = matrixData[0].size();
+        matrix_viewer->setRowCount(rowCount);
+        matrix_viewer->setColumnCount(columnCount);
+
+        // Установка заголовков (можно адаптировать в зависимости от требований)
+        headers.clear();
+        for (int i = 0; i < columnCount; ++i) {
+            headers << QString("Column %1").arg(i + 1);
+        }
+        matrix_viewer->setHorizontalHeaderLabels(headers);
+
+        // Заполнение QTableWidget данными из матрицы
+        for (int i = 0; i < rowCount; ++i) {
+            for (int j = 0; j < columnCount; ++j) {
+                QTableWidgetItem *item = new QTableWidgetItem(QString::number(matrixData[i][j]));
+                matrix_viewer->setItem(i, j, item);
+            }
+        }
     }
 }
 

@@ -15,10 +15,11 @@ class User(Base):
     name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     login = Column(String, unique=True, index=True)
-    password = Column(String) # hashed
+    password = Column(String) 
 
 # Функция для создания таблиц
 def create_db_and_tables():
+    print(f"CREATING USERS.DB = {DATABASE_URL}")
     Base.metadata.create_all(bind=engine)
 
 # Функция для добавления пользователя
