@@ -16,69 +16,80 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
 }
 
 // Слот для добавления файла
-// Слот для добавления файла
-void calculation_matrix_form::on_add_file_button_clicked()
-{
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"), "",
-                                                    tr("All Files (*.*);;Matrix file (*.mtx)"));
-    if (!fileName.isEmpty()) {
-        // Записываем путь к файлу в текстовое поле
-        file_path_line_edit->setText(fileName);
+void calculation_matrix_form::on_add_file_button_clicked() {
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open Matrix File"), "", tr("Matrix Market (*.mtx);;All Files (*.*)"));
+    if (fileName.isEmpty()) return;
 
-        // Открываем файл
-        QFile file(fileName);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QMessageBox::warning(this, tr("Error"), tr("Could not open file"));
-            return;
-        }
+    // Устанавливаем путь к файлу в QLineEdit
+    file_path_line_edit->setText(fileName);
 
-        // Очистка предыдущего содержимого таблицы
-        matrix_viewer->clear();
+    // Отображаем название файла в QLabel
+    your_matrix_label->setText("Loaded Matrix: " + QFileInfo(fileName).fileName());
 
-        // Считывание и анализ содержимого файла .mtx
-        QTextStream in(&file);
-        QStringList headers;
-        QList<QList<double>> matrixData;
-
-        // Пропускаем комментарии в файле .mtx
-        while (!in.atEnd()) {
-            QString line = in.readLine();
-            if (line.startsWith('%')) continue;
-
-            // Разделяем строку по пробелам и конвертируем элементы в числа
-            QStringList elements = line.split(' ', Qt::SkipEmptyParts);
-            QList<double> row;
-            for (const QString &element : elements) {
-                row.append(element.toDouble());
-            }
-            matrixData.append(row);
-        }
-
-        // Закрываем файл
-        file.close();
-
-        // Установка количества строк и столбцов в соответствии с матрицей
-        int rowCount = matrixData.size();
-        int columnCount = matrixData[0].size();
-        matrix_viewer->setRowCount(rowCount);
-        matrix_viewer->setColumnCount(columnCount);
-
-        // Установка заголовков (можно адаптировать в зависимости от требований)
-        headers.clear();
-        for (int i = 0; i < columnCount; ++i) {
-            headers << QString("Column %1").arg(i + 1);
-        }
-        matrix_viewer->setHorizontalHeaderLabels(headers);
-
-        // Заполнение QTableWidget данными из матрицы
-        for (int i = 0; i < rowCount; ++i) {
-            for (int j = 0; j < columnCount; ++j) {
-                QTableWidgetItem *item = new QTableWidgetItem(QString::number(matrixData[i][j]));
-                matrix_viewer->setItem(i, j, item);
-            }
-        }
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, tr("Error"), tr("Could not open file"));
+        return;
     }
+
+    QTextStream in(&file);
+    QString line;
+    bool isPattern = false;
+
+    // Читаем заголовок формата
+    while (!in.atEnd()) {
+        line = in.readLine();
+        if (line.startsWith("%%MatrixMarket")) {
+            isPattern = line.contains("pattern"); // Проверяем, является ли формат "pattern"
+        }
+        if (!line.startsWith("%")) break; // Пропускаем комментарии
+    }
+
+    // Читаем размер матрицы и количество ненулевых элементов
+    QStringList sizeData = line.split(' ', Qt::SkipEmptyParts);
+    if (sizeData.size() < 3) {
+        QMessageBox::warning(this, tr("Error"), tr("Invalid Matrix Market format"));
+        return;
+    }
+
+    int rows = sizeData[0].toInt();
+    int columns = sizeData[1].toInt();
+    int nonZeros = sizeData[2].toInt();
+
+    // Устанавливаем размер таблицы в QTableWidget
+    matrix_viewer->setRowCount(rows);
+    matrix_viewer->setColumnCount(columns);
+
+    // Устанавливаем фиксированный размер ячеек для равной ширины и высоты
+    int cellSize = 50;
+    for (int i = 0; i < rows; ++i) {
+        matrix_viewer->setRowHeight(i, cellSize);
+    }
+    for (int j = 0; j < columns; ++j) {
+        matrix_viewer->setColumnWidth(j, cellSize);
+    }
+
+    // Заполнение ненулевых элементов
+    while (!in.atEnd()) {
+        line = in.readLine();
+        if (line.isEmpty()) continue;
+
+        QStringList elements = line.split(' ', Qt::SkipEmptyParts);
+        if (elements.size() < 2) continue;
+
+        int row = elements[0].toInt() - 1;
+        int col = elements[1].toInt() - 1;
+        double value = isPattern ? 1.0 : elements[2].toDouble();
+
+        QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
+        item->setTextAlignment(Qt::AlignCenter);
+        matrix_viewer->setItem(row, col, item);
+    }
+
+    file.close();
 }
+
+
 
 // Реализация функции загрузки файла на сервер
 void calculation_matrix_form::on_load_file_to_server_button()
@@ -192,7 +203,7 @@ void calculation_matrix_form::setup_ui()
     load_file_to_server_button = new QPushButton("Загрузить файл на сервер", this);
     decomposite_button = new QPushButton("Разложить матрицу", this);
 
-    QTableWidget *matrix_viewer = new QTableWidget;
+    matrix_viewer = new QTableWidget;
     QStringList headers;
     headers << "Column 1" << "Column 2" << "Column 3" << "Column 4" << "Column 5";
     matrix_viewer->setHorizontalHeaderLabels(headers);
