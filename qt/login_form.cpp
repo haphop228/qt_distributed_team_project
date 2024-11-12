@@ -6,8 +6,8 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <iostream>
-
-const QString MAIN_SERVER_URL("http://localhost:8002/login");
+// main server http://localhost:8002
+const QString MAIN_SERVER_URL("http://localhost:8002");
 
 login_form::login_form(QWidget *parent)
     : QDialog(parent)
@@ -38,7 +38,7 @@ void login_form::on_login_clicked()
     QNetworkAccessManager *manager = new QNetworkAccessManager(this);
 
     // Устанавливаем URL для запроса
-    QUrl url(MAIN_SERVER_URL);
+    QUrl url(MAIN_SERVER_URL + "/login");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 

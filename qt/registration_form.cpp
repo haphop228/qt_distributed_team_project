@@ -1,7 +1,8 @@
 #include "registration_form.h"
 #include "ui_registration_form.h"
 
-const QString MAIN_SERVER_URL("http://localhost:8002/login");
+// main server http://localhost:8002
+const QString MAIN_SERVER_URL("http://localhost:8002");
 
 registration_form::registration_form(QWidget *parent) :
     QDialog(parent),
@@ -52,7 +53,7 @@ void registration_form::on_reg_clicked()
     QNetworkAccessManager* manager = new QNetworkAccessManager(this);
 
     // Указываем URL сервера
-    QUrl url("http://localhost:8000/register");
+    QUrl url(MAIN_SERVER_URL + "/register");
     QNetworkRequest request(url);
 
     // Устанавливаем заголовок, чтобы указать тип содержимого (JSON)
