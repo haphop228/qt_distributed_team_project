@@ -24,6 +24,9 @@ void login_form::on_login_clicked()
     QByteArray passwordHash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256);
     QString hashedPassword = passwordHash.toHex();
 
+    // Сохраняем логин пользователя для дальнейших операций
+    m_userlogin = userlogin;
+
     // Создаем JSON-объект для отправки на сервер
     QJsonObject json;
     json["login"] = userlogin;
@@ -54,7 +57,7 @@ void login_form::on_login_clicked()
 
             // Если сервер вернул успешный ответ, показываем главное окно
             QMessageBox::information(this, "Успех", "Вход выполнен успешно!");
-            calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form();
+            calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form(m_userlogin);
             calculation_matrix_form->show();
             this->hide(); // Скрываем окно входа
         }
