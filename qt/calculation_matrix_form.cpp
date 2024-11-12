@@ -47,7 +47,6 @@ void calculation_matrix_form::on_load_file_to_server_button()
 
     // Параметр "login"
     QHttpPart loginPart;
-    QMessageBox::information(this, "Успех", m_userlogin);
     loginPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"login\""));
     loginPart.setBody(m_userlogin.toUtf8());  // Установка логина как QByteArray
     multiPart->append(loginPart);
