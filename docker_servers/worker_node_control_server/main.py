@@ -3,7 +3,8 @@ import httpx
 import os
 import numpy as np
 from scipy.io import mmread
-from io import BytesIO,StringIO
+from io import BytesIO
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -11,6 +12,9 @@ app = FastAPI()
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
 MAIN_SERVER_URL = os.getenv("MAIN_SERVER_URL")
+
+class MatrixRequest(BaseModel):
+    matrix_name: str
 
 # Function to check server availability
 async def check_server_availability(url: str):
@@ -49,17 +53,19 @@ async def get_matrix_by_name(matrix_name: str):
         raise HTTPException(status_code=500, detail="Failed to connect to MongoDB server") from e
 
 @app.post("/print_matrix_by_matrix_name")
-async def print_matrix_by_matrix_name(matrix_name: str):
+async def print_matrix_by_matrix_name(request: MatrixRequest):
+    matrix_name = request.matrix_name
     # Retrieve the matrix file in binary format
     matrix_data = await get_matrix_by_name(matrix_name)
-    
+    matrix_data = matrix_data.content
+    print(f"matrix data:\n {matrix_data}")
     # Convert the binary matrix data to a NumPy array
     try:
         matrix = mmread(BytesIO(matrix_data)).toarray()  # Load .mtx content to a NumPy array
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to parse the matrix file") from e
+        raise HTTPException(status_code=500, detail=f"Failed to parse the matrix file : {e}") from e
 
     # Print the matrix to the terminal
-    print(f"Matrix '{matrix_name}':\n", matrix)
+    print(f"Matrix '{matrix_name}':\n", np.round(matrix, 1))
     
     return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}

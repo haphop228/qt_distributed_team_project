@@ -154,7 +154,7 @@ async def send_matrix_by_matrix_name(matrix_name: str):
     
     # Сохраняем содержимое матрицы во временный файл для отправки
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mtx") as temp_file:
-        temp_file.write(matrix)
+        temp_file.write(matrix.read())
         temp_file_path = temp_file.name
 
     # Возвращаем файл в ответе
