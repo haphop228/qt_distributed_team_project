@@ -8,7 +8,7 @@ app = FastAPI()
 # Загрузка конфигураций
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
-
+WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL")
 # Pydantic модель для регистрации пользователя
 class RegisterCredentials(BaseModel):
     name: str
@@ -24,6 +24,9 @@ class LoginCredentials(BaseModel):
 # Pydantic модель для получения id
 class IdCredentials(BaseModel):
     login: str
+    
+class MatrixName(BaseModel):
+    matrix_name: str
 
 # Функция для проверки доступности серверов
 async def check_server_availability(url: str):
@@ -95,6 +98,26 @@ async def get_matrix_names_by_user_login(credentials: IdCredentials):
         raise HTTPException(status_code=response.status_code, detail="Ошибка при получении списка матриц")
     
     return response.json()
+
+@app.post("/calculate_invertible_matrix_by_matrix_name")
+async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):
+    matrix_name = credentials.matrix_name
+    print(f'trying to get invertible matrix for matrix with name = {matrix_name}')
+    
+    if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status"):
+        raise HTTPException(status_code=503, detail="MongoDB недоступен")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{WORKER_CONTROL_SERVER_URL}/calculate_invertible_matrix_by_matrix_name", json=credentials.model_dump())
+    
+    if response.status_code != 200:
+        print(f"error in calculations: {response.status_code}")
+        raise HTTPException(status_code=response.status_code, detail="Ошибка при вычислении обраной матрицы")
+        
+    print("invertible matrix calculated successfully!")
+    return response.json()
+    
+
 
 @app.get("/status")
 async def get_status():

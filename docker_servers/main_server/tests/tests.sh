@@ -17,8 +17,8 @@ echo "USER_LOGIN: $USER_LOGIN"
 echo "USER_PASSWORD: $USER_PASSWORD"
 
 # Test Matrix File
-MATRIX_FILE_PATH="./Matrix_JGL009.mtx"
-MATRIX_FILE_NAME="Matrix_JGL009.mtx"
+MATRIX_FILE_PATH="./generated_integer_matrix650.mtx"
+MATRIX_FILE_NAME="generated_integer_matrix650.mtx"
 
 # cd ../../ 
 # docker-compose up -u
@@ -89,13 +89,14 @@ curl -s -X POST "$MAIN_SERVER_URL/get_matrix_names_by_user_login" \
     #| grep -q "$MATRIX_FILE_NAME"
 #print_result $? "Retrieve matrix list"
 
-# # 5. Test retrieving matrix data by filename
-# echo ""
-# echo ""
-# echo "5. Testing retrieval of matrix data by filename..."
-# curl -s "$MAIN_SERVER_URL/get_matrix_by_filename/$MATRIX_FILE_NAME" 
-#     #| grep -q "%%MatrixMarket"
-# #print_result $? "Retrieve matrix data by filename"
+# 5. Test invertible matrix by name
+echo ""
+echo ""
+echo "5. Testing invertible matrix by matrix name..."
+curl -X POST "$MAIN_SERVER_URL/calculate_invertible_matrix_by_matrix_name" \
+-H "Content-Type: application/json" \
+-d '{"matrix_name": "'"$MATRIX_FILE_NAME"'"}'
+
 
 echo ""
 echo ""

@@ -88,14 +88,23 @@ async def get_matrix_by_name(matrix_name: str):
                 matrix_data = response.content
                 # Конвертируем данные из Matrix Market в numpy.array
                 try:
-                    matrix = mmread(BytesIO(matrix_data)).toarray()
+                    matrix = mmread(BytesIO(matrix_data))
+                    # Проверяем, является ли матрица разреженной (если да, преобразуем в плотную)
+                    if isinstance(matrix, np.ndarray):
+                        print("Matrix is already a dense numpy array")
+                    else:
+                        print("Matrix is sparse, converting to dense numpy array")
+                        matrix = matrix.toarray()  # Преобразуем разреженную матрицу в плотную
                     print("Matrix converted to np.array")
                     return matrix
                 except Exception as e:
+                    print(f"Failed to parse the matrix file (mtx -> np array): {e}")
                     raise HTTPException(status_code=500, detail=f"Failed to parse the matrix file: {e}") from e
             else:
+                print("Matrix not found on MongoDB server")
                 raise HTTPException(status_code=response.status_code, detail="Matrix not found on MongoDB server")
     except httpx.RequestError as e:
+        print("Failed to connect to MongoDB server")
         raise HTTPException(status_code=500, detail="Failed to connect to MongoDB server") from e
 
 @app.post("/print_matrix_by_matrix_name")
@@ -125,11 +134,13 @@ def calculate_invertible_matrix(matrix: np.array) -> np.array:
     print(f'Trying to get invertible with np.linalg.inv')
     # Проверка на квадратную форму
     if matrix.shape[0] != matrix.shape[1]:
+        print("Matrix must be square to calculate its inverse")
         raise ValueError("Matrix must be square to calculate its inverse.")
 
     # Проверка на необратимость
     determinant = np.linalg.det(matrix)
     if determinant == 0:
+        print("Matrix is not invertible (determinant is zero).")
         raise ValueError("Matrix is not invertible (determinant is zero).")
     
     # Вычисление обратной матрицы
@@ -176,6 +187,7 @@ async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
         print(f"Trying to get {matrix_name} with await get_matrix_by_name")
         matrix = await get_matrix_by_name(matrix_name)  # Возвращает матрицу как np.array
     except HTTPException as e:
+        print(f"error in getting matrix from MONGO : {e, e.detail}")
         raise HTTPException(status_code=e.status_code, detail=f"Failed to fetch the matrix: {e.detail}")
 
     # Вычисление обратной матрицы
@@ -183,6 +195,7 @@ async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
         print(f"Trying to get matrix^-1 with calculate_invertible_matrix")
         inverse_matrix = calculate_invertible_matrix(matrix)
     except ValueError as e:
+        print(f"error in np.linalg.inv = {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     print("matrix^-1 computed successfully!")
     # Возвращение результата в формате JSON (списки для сериализации)
