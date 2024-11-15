@@ -130,11 +130,12 @@ async def get_status():
     # Явное ожидание выполнения check_server_availability
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
-
+    worker_control_server_status = await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status")
     return {
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
         "MONGO_SERVER_URL": MONGO_SERVER_URL,
         "sqlite_status": sqlite_status,
-        "mongo_server_status": mongo_server_status
+        "mongo_server_status": mongo_server_status,
+        "worker_control_server_status": worker_control_server_status
     }
