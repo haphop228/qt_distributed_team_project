@@ -181,25 +181,24 @@ void calculation_matrix_form::on_load_file_to_server_button()
 
 void calculation_matrix_form::on_decomposite_button_clicked()
 {
-    // Создаем и показываем окно загрузки
-    loadingDialog = new Loading(this);
-    loadingDialog->setAttribute(Qt::WA_DeleteOnClose); // Удаление виджета после закрытия
-    loadingDialog->show();
+    QString filePath = file_path_line_edit->text();
+    if (filePath.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "Выберите файл для загрузки.");
+        return;
+    }
 
-    download_files_form *downloadFilesForm = new download_files_form();
-    // Запускаем длительную операцию в отдельном потоке
-    QThread *thread = QThread::create([=]() {
-        longRunningOperation(); // Вызов длительной операции
+    // Создаем объект QNetworkAccessManager для отправки запроса
+    QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
 
-        // Закрытие окна загрузки после завершения операции
-        QMetaObject::invokeMethod(loadingDialog, "close");
-        this->hide();
-    });
+    // URL для отправки запроса
+    QUrl url(MAIN_SERVER_URL + "/calculate_invertible_matrix_by_matrix_name");
+    QNetworkRequest request(url);
 
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater); // Удаление потока после завершения
-    thread->start();
+    // Создаем многочастный запрос (multipart) для передачи файла и логина
+    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
 
-    downloadFilesForm->show();
+    // Параметр "matrix name"
+    // допиши функцию, чтобы она отправляла запрос на обработку матрицы и получала ответ в формате json
 }
 
 // Функция "затычка"

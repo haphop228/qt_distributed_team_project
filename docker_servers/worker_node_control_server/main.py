@@ -41,12 +41,10 @@ def remove_file(file_path: str):
 async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
-    main_server_status = await check_server_availability(f"{MAIN_SERVER_URL}/status")
     return {
         "status": "running",
         "sqlite_status": sqlite_status,
         "mongo_server_status": mongo_server_status,
-        "main_server_status": main_server_status
     }
 
 def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
