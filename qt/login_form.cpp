@@ -59,7 +59,7 @@ void login_form::on_login_clicked()
             QMessageBox::information(this, "Успех", "Вход выполнен успешно!");
             calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form(m_userlogin);
             calculation_matrix_form->show();
-            this->hide(); // Скрываем окно входа
+            this->close(); // Скрываем окно входа
         }
         else {
             // Ошибка при запросе

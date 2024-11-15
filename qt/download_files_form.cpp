@@ -38,8 +38,31 @@ void download_files_form::setup_ui()
     connect(download_button, &QPushButton::clicked, this, &download_files_form::on_download_button_clicked);
 }
 
+void download_files_form::setInverseMatrix(const QJsonArray &matrix)
+{
+    inverseMatrix = matrix;
+
+    // Отображаем матрицу в окне
+    QString matrixString = "Обратная матрица:\n";
+    for (const QJsonValue &row : inverseMatrix) {
+        QJsonArray rowArray = row.toArray();
+        QString rowString;
+        for (const QJsonValue &elem : rowArray) {
+            rowString += QString::number(elem.toDouble()) + " ";
+        }
+        matrixString += rowString + "\n";
+    }
+
+    // Создаем и показываем QLabel для матрицы
+    QLabel *matrixLabel = new QLabel(matrixString, this);
+    matrixLabel->setWordWrap(true);
+    matrixLabel->setStyleSheet("font-size: 14px; white-space: pre;");
+    layout()->addWidget(matrixLabel); // Добавляем метку в компоновку
+}
+
 void download_files_form::on_download_button_clicked()
 {
+    // Просто выводим сообщение для демонстрации
     QMessageBox::information(this, "Информация", "Всё");
 }
 

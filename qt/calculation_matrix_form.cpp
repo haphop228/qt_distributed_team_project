@@ -187,6 +187,11 @@ void calculation_matrix_form::on_decomposite_button_clicked()
         return;
     }
 
+    // Извлекаем имя матрицы из пути к файлу (например, последние части пути)
+    QFileInfo fileInfo(filePath);
+    QString matrixName = fileInfo.fileName();
+    qDebug() << "Matrix Name:" << matrixName;
+
     // Создаем объект QNetworkAccessManager для отправки запроса
     QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
 
@@ -194,11 +199,52 @@ void calculation_matrix_form::on_decomposite_button_clicked()
     QUrl url(MAIN_SERVER_URL + "/calculate_invertible_matrix_by_matrix_name");
     QNetworkRequest request(url);
 
-    // Создаем многочастный запрос (multipart) для передачи файла и логина
-    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+    // Создаем JSON с именем матрицы
+    QJsonObject json;
+    json["matrix_name"] = matrixName;
 
-    // Параметр "matrix name"
-    // допиши функцию, чтобы она отправляла запрос на обработку матрицы и получала ответ в формате json
+    // Преобразуем в QJsonDocument
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    // Устанавливаем заголовки
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // Отправляем POST-запрос
+    QNetworkReply *reply = networkManager->post(request, data);
+
+    // Обработка ответа
+    connect(reply, &QNetworkReply::finished, this, [reply, this]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            // Если запрос успешен, получаем ответ
+            QByteArray response = reply->readAll();
+            QJsonDocument responseDoc = QJsonDocument::fromJson(response);
+
+            if (responseDoc.isObject()) {
+                QJsonObject responseObject = responseDoc.object();
+                // Обработка данных из ответа
+                QJsonArray originalMatrix = responseObject["original_matrix"].toArray();
+                QJsonArray inverseMatrix = responseObject["inverse_matrix"].toArray();
+
+                // Выводим матрицы для проверки
+                qDebug() << "Original Matrix:" << originalMatrix;
+                qDebug() << "Inverse Matrix:" << inverseMatrix;
+
+                // Передаем матрицу в окно download_files_form
+                download_files_form *downloadForm = new download_files_form();
+                downloadForm->setInverseMatrix(inverseMatrix); // Передаем матрицу
+                downloadForm->show();
+                this->close();
+
+                // Здесь можно обработать матрицы, например, отобразить их в UI или отправить дальше
+            }
+        } else {
+            // Обработка ошибки
+            QString errorMessage = reply->errorString();
+            QMessageBox::warning(this, "Ошибка", "Ошибка запроса: " + errorMessage);
+        }
+        reply->deleteLater();
+    });
 }
 
 // Функция "затычка"
