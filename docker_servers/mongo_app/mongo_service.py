@@ -33,7 +33,7 @@ async def find_matrices_by_user_id(user_id: int):
     matrices = []
     for matrix in grid_fs.find({"user_id": user_id}):
         matrices.append({"file_id": str(matrix._id), "filename": matrix.filename})
-    print(f'\n\nmatrix by id {matrices}\n')
+    print(f'\n\n matrices by id {matrices}\n')
     return matrices
 
 async def find_matrix_by_filename(filename: str):
