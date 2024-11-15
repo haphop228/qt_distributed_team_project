@@ -1,12 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 import httpx
 import os
 import numpy as np
-from scipy.io import mmread
+from scipy.io import mmread,mmwrite
 from io import BytesIO
 from pydantic import BaseModel
 
 app = FastAPI()
+TEMP_DIR = "temp_mtx_files"
 
 # Load configurations from environment variables
 SQLITE_URL = os.getenv("SQLITE_URL")
@@ -24,6 +26,16 @@ async def check_server_availability(url: str):
             return response.status_code == 200
     except httpx.RequestError:
         return False
+    
+def remove_file(file_path: str):
+    """
+    Удаляет временный файл.
+    """
+    try:
+        os.remove(file_path)
+        print(f"Temporary file {file_path} removed.")
+    except OSError as e:
+        print(f"Error removing file {file_path}: {e}")
 
 @app.get("/status")
 async def get_status():
@@ -36,6 +48,32 @@ async def get_status():
         "mongo_server_status": mongo_server_status,
         "main_server_status": main_server_status
     }
+
+def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
+    """
+    Конвертирует numpy.array в формат Matrix Market (.mtx) и сохраняет в файл.
+
+    Args:
+        matrix (np.ndarray): Матрица в формате numpy.array.
+        file_path (str): Путь к файлу для сохранения в формате .mtx.
+
+    Raises:
+        ValueError: Если входная матрица не двухмерная.
+        IOError: Если не удается сохранить файл.
+    """
+    if not isinstance(matrix, np.ndarray):
+        raise ValueError("Input must be a numpy.ndarray.")
+
+    if matrix.ndim != 2:
+        raise ValueError("Input matrix must be two-dimensional.")
+
+    try:
+        mmwrite(file_path, matrix)
+        print(f"Matrix successfully saved in Matrix Market format to {file_path}")
+        return file_path
+    except Exception as e:
+        raise IOError(f"Failed to write matrix to file: {e}") from e
+
 @app.post("/get_matrix_by_name")
 async def get_matrix_by_name(matrix_name: str):
     """
@@ -152,3 +190,4 @@ async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
         "original_matrix": matrix.tolist(),
         "inverse_matrix": inverse_matrix.tolist()
     }
+    
