@@ -28,6 +28,8 @@ private:
     Ui::login_form *ui;
     void setup_ui();
 
+    QString m_userlogin;  // Поле для хранения логина
+
     QLabel *welcomeLabel;
     QLabel *instructionLabel;
 

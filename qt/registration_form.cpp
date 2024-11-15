@@ -1,6 +1,9 @@
 #include "registration_form.h"
 #include "ui_registration_form.h"
 
+// main server http://localhost:8002
+const QString MAIN_SERVER_URL("http://localhost:8002");
+
 registration_form::registration_form(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::registration_form)
@@ -30,6 +33,76 @@ void registration_form::on_reg_clicked()
         QMessageBox::warning(this, "Input Error", "Invalid email address.");
         return;
     }
+
+    // Хешируем пароль перед отправкой
+    QByteArray passwordHash = QCryptographicHash::hash(user_password.toUtf8(), QCryptographicHash::Sha256);
+    QString hashedPassword = passwordHash.toHex();
+
+    // Создаем JSON-объект с данными пользователя
+    QJsonObject json;
+    json["name"] = user_name;
+    json["email"] = user_email;
+    json["login"] = user_login;
+    json["password"] = hashedPassword;
+
+    // Преобразуем JSON-объект в JSON-документ
+    QJsonDocument jsonDoc(json);
+    QByteArray jsonData = jsonDoc.toJson();
+
+    // Создаем объект менеджера для выполнения запроса
+    QNetworkAccessManager* manager = new QNetworkAccessManager(this);
+
+    // Указываем URL сервера
+    QUrl url(MAIN_SERVER_URL + "/register");
+    QNetworkRequest request(url);
+
+    // Устанавливаем заголовок, чтобы указать тип содержимого (JSON)
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // Выполняем POST-запрос
+    QNetworkReply* reply = manager->post(request, jsonData);
+
+    // Подключаем обработчик ответа от сервера
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            // Успешно получили ответ
+            QByteArray response_data = reply->readAll();
+            qDebug() << "Response from server: " << response_data;
+
+            // Если сервер вернул успешный ответ, выводим сообщение об успехе
+            QMessageBox::information(this, "Success", "Registration successful!");
+            this->close();
+
+        } else {
+            // Ошибка при запросе
+            QByteArray response_data = reply->readAll();  // Чтение тела ответа
+            qDebug() << "Error response from server: " << response_data;
+
+            // Попытаемся распарсить JSON, который сервер отправляет в ответе
+            QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data);
+            QJsonObject jsonObj = jsonDoc.object();
+
+            // Проверяем наличие поля "detail" в JSON (именно там сервер отправляет сообщение об ошибке)
+            if (jsonObj.contains("detail")) {
+                QString errorDetail = jsonObj["detail"].toString();
+
+                if (errorDetail == "User with this email already exists") {
+                    QMessageBox::warning(this, "Registration Error", "Failed to register. User with this email already exists.");
+                } else if (errorDetail == "User with this login already exists") {
+                    QMessageBox::warning(this, "Registration Error", "Failed to register. User with this login already exists.");
+                } else {
+                    QMessageBox::warning(this, "Registration Error", "Failed to register. error: " + errorDetail);
+                }
+
+            } else {
+                // Если в ответе нет детального описания ошибки
+                QMessageBox::warning(this, "Registration Error", "Failed to register. Unknown error.");
+            }
+        }
+
+        reply->deleteLater();  // Удаляем reply после обработки
+    });
+
 }
 
 void registration_form::setup_ui(){
