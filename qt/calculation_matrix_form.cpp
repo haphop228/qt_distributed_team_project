@@ -15,8 +15,8 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
     setup_ui();
 }
 
-// Слот для добавления файла
 void calculation_matrix_form::on_add_file_button_clicked() {
+    // TODO : пофиксить показ матриц у которых другие типы (не  matrix array integer general)
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open Matrix File"), "", tr("Matrix Market (*.mtx);;All Files (*.*)"));
     if (fileName.isEmpty()) return;
 
@@ -35,26 +35,33 @@ void calculation_matrix_form::on_add_file_button_clicked() {
     QTextStream in(&file);
     QString line;
     bool isPattern = false;
+    bool isCoordinate = false;
+    bool isArray = false;
+    bool isInteger = false;
+    bool isReal = false;
 
     // Читаем заголовок формата
     while (!in.atEnd()) {
         line = in.readLine();
         if (line.startsWith("%%MatrixMarket")) {
-            isPattern = line.contains("pattern"); // Проверяем, является ли формат "pattern"
+            isPattern = line.contains("pattern"); // TODO // Проверяем, является ли формат "pattern"
+            isCoordinate = line.contains("coordinate"); // TODO  // Проверяем на координатный формат
+            isArray = line.contains("array");  // Проверяем на массивный формат
+            isInteger = line.contains("integer");  // Проверяем на целочисленный формат
+            isReal = line.contains("real");
         }
-        if (!line.startsWith("%")) break; // Пропускаем комментарии
+        if (!line.startsWith("%")) break;  // Пропускаем комментарии
     }
 
-    // Читаем размер матрицы и количество ненулевых элементов
+    // Читаем размер матрицы и количество элементов
     QStringList sizeData = line.split(' ', Qt::SkipEmptyParts);
-    if (sizeData.size() < 3) {
+    if (sizeData.size() < 2) {
         QMessageBox::warning(this, tr("Error"), tr("Invalid Matrix Market format"));
         return;
     }
 
     int rows = sizeData[0].toInt();
     int columns = sizeData[1].toInt();
-    int nonZeros = sizeData[2].toInt();
 
     // Устанавливаем размер таблицы в QTableWidget
     matrix_viewer->setRowCount(rows);
@@ -69,26 +76,41 @@ void calculation_matrix_form::on_add_file_button_clicked() {
         matrix_viewer->setColumnWidth(j, cellSize);
     }
 
-    // Заполнение ненулевых элементов
+    // Обработка элементов матрицы в зависимости от типа
+    int count = 0;
     while (!in.atEnd()) {
         line = in.readLine();
         if (line.isEmpty()) continue;
 
         QStringList elements = line.split(' ', Qt::SkipEmptyParts);
-        if (elements.size() < 2) continue;
+        if (elements.size() < 1) continue;
 
-        int row = elements[0].toInt() - 1;
-        int col = elements[1].toInt() - 1;
-        double value = isPattern ? 1.0 : elements[2].toDouble();
+        double value = 0.0;
+        if (isArray) {
+            if (isInteger) {
+                // Для целочисленных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toInt();
+            } else if (isReal){
+                // Для вещественных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toDouble();
+            }
+        }
 
+        int row = count / columns;
+        int col = count % columns;
+
+        // Заполняем таблицу значениями
         QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
         item->setTextAlignment(Qt::AlignCenter);
         matrix_viewer->setItem(row, col, item);
+
+        count++;
     }
 
     file.close();
 }
-
 
 
 // Реализация функции загрузки файла на сервер
