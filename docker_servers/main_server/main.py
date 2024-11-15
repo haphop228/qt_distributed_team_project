@@ -112,7 +112,13 @@ async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):
     
     if response.status_code != 200:
         print(f"error in calculations: {response.status_code}")
-        raise HTTPException(status_code=response.status_code, detail="Ошибка при вычислении обраной матрицы")
+        try:
+            error_details = response.json()  # Попытаться распарсить JSON-ответ с ошибкой
+            print(f"Error details: {error_details}")
+        except ValueError:
+            error_details = response.text  # Если не удалось распарсить JSON, выведем текст ошибки
+            print(f"Error details: {error_details}")
+        raise HTTPException(status_code=response.status_code, detail=error_details)
         
     print("invertible matrix calculated successfully!")
     return response.json()
