@@ -69,3 +69,4 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     print(f"Matrix '{matrix_name}':\n", np.round(matrix, 1))
     
     return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}
+

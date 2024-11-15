@@ -6,7 +6,7 @@ DOCKER_USERNAME="alice3e"
 IMAGE_TAG="latest"
 
 # Массив с именами сервисов
-SERVERS=("main_server" "mongo_app" "sqlite_app")
+SERVERS=("main_server" "mongo_app" "sqlite_app" "worker_node_control_server")
 
 # Логин в Docker Hub
 echo "Logging in to Docker Hub..."
