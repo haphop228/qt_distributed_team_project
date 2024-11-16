@@ -8,7 +8,7 @@ app = FastAPI()
 # Загрузка конфигураций
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
-WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL", default="http://worker-node-control-server:8003")
+WORKER_CONTROL_SERVER_URL = "http://worker-node-control-server:8003" #os.getenv("WORKER_CONTROL_SERVER_URL", default="http://worker-node-control-server:8003")
 # Pydantic модель для регистрации пользователя
 class RegisterCredentials(BaseModel):
     name: str
@@ -133,6 +133,9 @@ async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
     worker_control_server_status = await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status")
+    print(SQLITE_URL, sqlite_status)
+    print(MONGO_SERVER_URL, mongo_server_status)
+    print(WORKER_CONTROL_SERVER_URL, worker_control_server_status)
     return {
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
