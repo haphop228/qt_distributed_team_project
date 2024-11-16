@@ -32,8 +32,10 @@ class MatrixName(BaseModel):
 async def check_server_availability(url: str):
     try:
         async with httpx.AsyncClient() as client:
+            print(f" checking server availability for url:{url}")
             response = await client.get(url)
             if response.status_code == 200:
+                print(f"{url} - available!")
                 return True
     except httpx.RequestError:
         return False
@@ -135,6 +137,7 @@ async def get_status():
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
         "MONGO_SERVER_URL": MONGO_SERVER_URL,
+        "WORKER_CONTROL_SERVER_URL": WORKER_CONTROL_SERVER_URL,
         "sqlite_status": sqlite_status,
         "mongo_server_status": mongo_server_status,
         "worker_control_server_status": worker_control_server_status

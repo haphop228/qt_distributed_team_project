@@ -18,7 +18,7 @@ if ! docker buildx version >/dev/null 2>&1; then
 fi
 
 # Проверяем, есть ли активный builder
-if docker buildx inspect multiarch_builder > /dev/null 2>&1; then
+if docker buildx inspect multiarch_builder > /dev/null 2>&1; thenx
     echo "Using existing multiarch_builder..."
     docker buildx use multiarch_builder
 else
