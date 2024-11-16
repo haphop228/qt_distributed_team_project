@@ -5,6 +5,7 @@
 #include <QWidget>
 #include <QMessageBox>
 #include <QJsonArray> // Для использования QJsonArray
+#include <QPlainTextEdit>
 
 namespace Ui {
 class download_files_form;

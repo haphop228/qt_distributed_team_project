@@ -35,30 +35,34 @@ void download_files_form::setup_ui()
     setLayout(mainLayout);
 
     // Подключаем сигнал к слоту
-    connect(download_button, &QPushButton::clicked, this, &download_files_form::on_download_button_clicked);
+    //connect(download_button, &QPushButton::clicked, this, &download_files_form::on_download_button_clicked);
 }
 
 void download_files_form::setInverseMatrix(const QJsonArray &matrix)
 {
     inverseMatrix = matrix;
 
-    // Отображаем матрицу в окне
+    // Формируем строку с матрицей
     QString matrixString = "Обратная матрица:\n";
     for (const QJsonValue &row : inverseMatrix) {
         QJsonArray rowArray = row.toArray();
-        QString rowString;
+        QStringList rowElements;
         for (const QJsonValue &elem : rowArray) {
-            rowString += QString::number(elem.toDouble()) + " ";
+            rowElements << QString::number(elem.toDouble(), 'f', 6); // Формат с 6 знаками после запятой
         }
-        matrixString += rowString + "\n";
+        matrixString += rowElements.join("\t") + "\n"; // Используем табуляцию для выравнивания
     }
 
-    // Создаем и показываем QLabel для матрицы
-    QLabel *matrixLabel = new QLabel(matrixString, this);
-    matrixLabel->setWordWrap(true);
-    matrixLabel->setStyleSheet("font-size: 14px; white-space: pre;");
-    layout()->addWidget(matrixLabel); // Добавляем метку в компоновку
+    // Создаем QPlainTextEdit для отображения матрицы
+    QPlainTextEdit *matrixDisplay = new QPlainTextEdit(this);
+    matrixDisplay->setPlainText(matrixString);
+    matrixDisplay->setReadOnly(true); // Отключаем редактирование
+    matrixDisplay->setStyleSheet("font-size: 14px;");
+
+    // Добавляем QPlainTextEdit в компоновку
+    layout()->addWidget(matrixDisplay);
 }
+
 
 void download_files_form::on_download_button_clicked()
 {
