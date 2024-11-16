@@ -122,6 +122,7 @@ void calculation_matrix_form::on_load_file_to_server_button()
         return;
     }
 
+
     // Создаем объект QNetworkAccessManager для отправки запроса
     QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
 
