@@ -15,8 +15,8 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
     setup_ui();
 }
 
-// Слот для добавления файла
 void calculation_matrix_form::on_add_file_button_clicked() {
+    // TODO : пофиксить показ матриц у которых другие типы (не  matrix array integer\real general)
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open Matrix File"), "", tr("Matrix Market (*.mtx);;All Files (*.*)"));
     if (fileName.isEmpty()) return;
 
@@ -35,26 +35,33 @@ void calculation_matrix_form::on_add_file_button_clicked() {
     QTextStream in(&file);
     QString line;
     bool isPattern = false;
+    bool isCoordinate = false;
+    bool isArray = false;
+    bool isInteger = false;
+    bool isReal = false;
 
     // Читаем заголовок формата
     while (!in.atEnd()) {
         line = in.readLine();
         if (line.startsWith("%%MatrixMarket")) {
-            isPattern = line.contains("pattern"); // Проверяем, является ли формат "pattern"
+            isPattern = line.contains("pattern"); // TODO // Проверяем, является ли формат "pattern"
+            isCoordinate = line.contains("coordinate"); // TODO  // Проверяем на координатный формат
+            isArray = line.contains("array");  // Проверяем на массивный формат
+            isInteger = line.contains("integer");  // Проверяем на целочисленный формат
+            isReal = line.contains("real");
         }
-        if (!line.startsWith("%")) break; // Пропускаем комментарии
+        if (!line.startsWith("%")) break;  // Пропускаем комментарии
     }
 
-    // Читаем размер матрицы и количество ненулевых элементов
+    // Читаем размер матрицы и количество элементов
     QStringList sizeData = line.split(' ', Qt::SkipEmptyParts);
-    if (sizeData.size() < 3) {
+    if (sizeData.size() < 2) {
         QMessageBox::warning(this, tr("Error"), tr("Invalid Matrix Market format"));
         return;
     }
 
     int rows = sizeData[0].toInt();
     int columns = sizeData[1].toInt();
-    int nonZeros = sizeData[2].toInt();
 
     // Устанавливаем размер таблицы в QTableWidget
     matrix_viewer->setRowCount(rows);
@@ -69,26 +76,41 @@ void calculation_matrix_form::on_add_file_button_clicked() {
         matrix_viewer->setColumnWidth(j, cellSize);
     }
 
-    // Заполнение ненулевых элементов
+    // Обработка элементов матрицы в зависимости от типа
+    int count = 0;
     while (!in.atEnd()) {
         line = in.readLine();
         if (line.isEmpty()) continue;
 
         QStringList elements = line.split(' ', Qt::SkipEmptyParts);
-        if (elements.size() < 2) continue;
+        if (elements.size() < 1) continue;
 
-        int row = elements[0].toInt() - 1;
-        int col = elements[1].toInt() - 1;
-        double value = isPattern ? 1.0 : elements[2].toDouble();
+        double value = 0.0;
+        if (isArray) {
+            if (isInteger) {
+                // Для целочисленных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toInt();
+            } else if (isReal){
+                // Для вещественных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toDouble();
+            }
+        }
 
+        int row = count / columns;
+        int col = count % columns;
+
+        // Заполняем таблицу значениями
         QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
         item->setTextAlignment(Qt::AlignCenter);
         matrix_viewer->setItem(row, col, item);
+
+        count++;
     }
 
     file.close();
 }
-
 
 
 // Реализация функции загрузки файла на сервер
@@ -99,6 +121,7 @@ void calculation_matrix_form::on_load_file_to_server_button()
         QMessageBox::warning(this, "Ошибка", "Выберите файл для загрузки.");
         return;
     }
+
 
     // Создаем объект QNetworkAccessManager для отправки запроса
     QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
@@ -159,25 +182,70 @@ void calculation_matrix_form::on_load_file_to_server_button()
 
 void calculation_matrix_form::on_decomposite_button_clicked()
 {
-    // Создаем и показываем окно загрузки
-    loadingDialog = new Loading(this);
-    loadingDialog->setAttribute(Qt::WA_DeleteOnClose); // Удаление виджета после закрытия
-    loadingDialog->show();
+    QString filePath = file_path_line_edit->text();
+    if (filePath.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "Выберите файл для загрузки.");
+        return;
+    }
 
-    download_files_form *downloadFilesForm = new download_files_form();
-    // Запускаем длительную операцию в отдельном потоке
-    QThread *thread = QThread::create([=]() {
-        longRunningOperation(); // Вызов длительной операции
+    // Извлекаем имя матрицы из пути к файлу (например, последние части пути)
+    QFileInfo fileInfo(filePath);
+    QString matrixName = fileInfo.fileName();
+    qDebug() << "Matrix Name:" << matrixName;
 
-        // Закрытие окна загрузки после завершения операции
-        QMetaObject::invokeMethod(loadingDialog, "close");
-        this->hide();
+    // Создаем объект QNetworkAccessManager для отправки запроса
+    QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
+
+    // URL для отправки запроса
+    QUrl url(MAIN_SERVER_URL + "/calculate_invertible_matrix_by_matrix_name");
+    QNetworkRequest request(url);
+
+    // Создаем JSON с именем матрицы
+    QJsonObject json;
+    json["matrix_name"] = matrixName;
+
+    // Преобразуем в QJsonDocument
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    // Устанавливаем заголовки
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // Отправляем POST-запрос
+    QNetworkReply *reply = networkManager->post(request, data);
+
+    // Обработка ответа
+    connect(reply, &QNetworkReply::finished, this, [reply, this]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            // Если запрос успешен, получаем ответ
+            QByteArray response = reply->readAll();
+            QJsonDocument responseDoc = QJsonDocument::fromJson(response);
+
+            if (responseDoc.isObject()) {
+                QJsonObject responseObject = responseDoc.object();
+                // Обработка данных из ответа
+                QJsonArray originalMatrix = responseObject["original_matrix"].toArray();
+                QJsonArray inverseMatrix = responseObject["inverse_matrix"].toArray();
+
+                // Выводим матрицы для проверки
+                qDebug() << "Original Matrix:" << originalMatrix;
+                qDebug() << "Inverse Matrix:" << inverseMatrix;
+
+                // Передаем матрицу в окно download_files_form
+                download_files_form *downloadForm = new download_files_form();
+                downloadForm->setInverseMatrix(inverseMatrix); // Передаем матрицу
+                downloadForm->show();
+                this->close();
+
+                // Здесь можно обработать матрицы, например, отобразить их в UI или отправить дальше
+            }
+        } else {
+            // Обработка ошибки
+            QString errorMessage = reply->errorString();
+            QMessageBox::warning(this, "Ошибка", "Ошибка запроса: " + errorMessage);
+        }
+        reply->deleteLater();
     });
-
-    connect(thread, &QThread::finished, thread, &QThread::deleteLater); // Удаление потока после завершения
-    thread->start();
-
-    downloadFilesForm->show();
 }
 
 // Функция "затычка"
