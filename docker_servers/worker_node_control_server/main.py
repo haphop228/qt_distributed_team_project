@@ -43,8 +43,10 @@ async def get_status():
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
     return {
         "status": "running",
+        "SQLITE_URL" : SQLITE_URL,
+        "MONGO_SERVER_URL" : MONGO_SERVER_URL,
         "sqlite_status": sqlite_status,
-        "mongo_server_status": mongo_server_status,
+        "mongo_server_status": mongo_server_status
     }
 
 def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):

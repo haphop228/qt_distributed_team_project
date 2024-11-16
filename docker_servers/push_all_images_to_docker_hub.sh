@@ -7,9 +7,6 @@ IMAGE_TAG="latest"
 # Массив с именами сервисов
 SERVERS=("main_server" "mongo_app" "sqlite_app" "worker_node_control_server")
 
-# Логин в Docker Hub
-#echo "Logging in to Docker Hub..."
-#docker login -u "$DOCKER_USERNAME" || { echo "Failed to log in to Docker Hub"; exit 1; }
 
 # Проверяем, включён ли buildx
 if ! docker buildx version >/dev/null 2>&1; then
@@ -18,7 +15,7 @@ if ! docker buildx version >/dev/null 2>&1; then
 fi
 
 # Проверяем, есть ли активный builder
-if docker buildx inspect multiarch_builder > /dev/null 2>&1; thenx
+if docker buildx inspect multiarch_builder > /dev/null 2>&1; then
     echo "Using existing multiarch_builder..."
     docker buildx use multiarch_builder
 else
