@@ -36,6 +36,11 @@ async def check_server_availability(url: str):
         return False
     return False
 
+# Корневой маршрут, добавьте его
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the main server"}
+
 # API для входа пользователя
 @app.post("/login")
 async def login_user(credentials: LoginCredentials):

@@ -1,0 +1,51 @@
+# main-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-server
+  labels:
+    app: main-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: main-server
+  template:
+    metadata:
+      labels:
+        app: main-server
+    spec:
+      containers:
+      - name: main-server
+        image: alice3e/main_server:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: config-main-server
+      volumes:
+      - name: mongo-volume
+        persistentVolumeClaim:
+          claimName: mongo-pvc
+      - name: sqlite-volume
+        persistentVolumeClaim:
+          claimName: sqlite-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: main-server
+spec:
+  selector:
+    app: main-server
+  ports:
+    - name: main-port  # Имя порта внутри кластера
+      protocol: TCP
+      port: 8002
+      targetPort: 8000
+    - name: node-port  # Имя порта для NodePort
+      protocol: TCP
+      port: 30000
+      targetPort: 8000
+      nodePort: 30001
+  type: NodePort  # Устанавливаем тип как NodePort

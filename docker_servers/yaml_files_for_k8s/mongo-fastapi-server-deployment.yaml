@@ -1,0 +1,42 @@
+# mongo-fastapi-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-fastapi-server
+  labels:
+    app: mongo-fastapi-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-fastapi-server
+  template:
+    metadata:
+      labels:
+        app: mongo-fastapi-server
+    spec:
+      containers:
+      - name: mongo-fastapi-server
+        image: alice3e/mongo_app:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: config-mongo-server
+      volumes:
+      - name: mongo-volume
+        persistentVolumeClaim:
+          claimName: mongo-pvc  # Привязка к PVC для данных
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-fastapi-server
+spec:
+  selector:
+    app: mongo-fastapi-server
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8000
+  type: ClusterIP  # Тип ClusterIP, доступен только внутри кластера

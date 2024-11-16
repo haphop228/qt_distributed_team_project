@@ -4,7 +4,10 @@
 #include <QtCore/qjsonobject.h>
 
 
-const QString MAIN_SERVER_URL("http://localhost:8002");
+//const QString MAIN_SERVER_URL("http://localhost:8002");
+//const QString MAIN_SERVER_URL("http://192.168.49.2:30367");
+//const QString MAIN_SERVER_URL("http://192.168.49.2:30367");
+const QString MAIN_SERVER_URL("http://172.30.171.106:30001");
 
 calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidget *parent)
     : QMainWindow(parent)

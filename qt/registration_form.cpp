@@ -2,7 +2,9 @@
 #include "ui_registration_form.h"
 
 // main server http://localhost:8002
-const QString MAIN_SERVER_URL("http://localhost:8002");
+//const QString MAIN_SERVER_URL("http://localhost:8002");
+//const QString MAIN_SERVER_URL("http://192.168.49.2:30367");
+const QString MAIN_SERVER_URL("http://172.30.171.106:30001");
 
 registration_form::registration_form(QWidget *parent) :
     QDialog(parent),
