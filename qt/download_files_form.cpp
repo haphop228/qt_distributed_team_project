@@ -23,9 +23,9 @@ void download_files_form::setup_ui()
     mainLayout->addWidget(titleLabel, 0, Qt::AlignCenter); // Центрируем заголовок
 
     // Кнопка скачивания
-    download_button = new QPushButton("Скачать файлы с разложениями", this);
-    download_button->setStyleSheet("padding: 10px; font-size: 16px;");
-    mainLayout->addWidget(download_button, 0, Qt::AlignCenter); // Центрируем кнопку
+    //download_button = new QPushButton("Скачать файлы с разложениями", this);
+    //download_button->setStyleSheet("padding: 10px; font-size: 16px;");
+    //mainLayout->addWidget(download_button, 0, Qt::AlignCenter); // Центрируем кнопку
 
     // Добавляем отступы снизу
     QSpacerItem *spacer = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);

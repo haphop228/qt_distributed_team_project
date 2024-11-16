@@ -16,7 +16,7 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
 }
 
 void calculation_matrix_form::on_add_file_button_clicked() {
-    // TODO : пофиксить показ матриц у которых другие типы (не  matrix array integer general)
+    // TODO : пофиксить показ матриц у которых другие типы (не  matrix array integer\real general)
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open Matrix File"), "", tr("Matrix Market (*.mtx);;All Files (*.*)"));
     if (fileName.isEmpty()) return;
 
