@@ -114,16 +114,10 @@
 2. **Ошибки с Persistent Volumes**: Проверьте логи Minikube и убедитесь, что ваш локальный путь для `hostPath` существует.
 
 ---
+### Чтобы применить все environments
 kubectl create configmap config-mongo-db --from-env-file=./configs/config_mongo_db.env
 kubectl create configmap config-sqlite --from-env-file=./configs/config_sqlite.env
 kubectl create configmap config-mongo-server --from-env-file=./configs/config_mongo_server.env
 kubectl create configmap config-main-server --from-env-file=./configs/config_main_server.env
 kubectl create configmap config-worker-node --from-env-file=./configs/config_worker_node_control_server.env
-
-
-kubectl create configmap config-mongo-db --from-env-file="C:\Users\User\projects_c++\qt_distributed_team_project\docker_servers\configs\config_mongo_db.env"
-kubectl create configmap config-sqlite --from-env-file="C:\Users\User\projects_c++\qt_distributed_team_project\docker_servers\configs\config_sqlite.env"
-kubectl create configmap config-mongo-server --from-env-file="C:\Users\User\projects_c++\qt_distributed_team_project\docker_servers\configs\config_mongo_server.env"
-kubectl create configmap config-main-server --from-env-file="C:\Users\User\projects_c++\qt_distributed_team_project\docker_servers\configs\config_main_server.env"
-kubectl create configmap config-worker-node --from-env-file="C:\Users\User\projects_c++\qt_distributed_team_project\docker_servers\configs\config_worker_node_control_server.env"
 
