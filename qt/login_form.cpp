@@ -6,8 +6,14 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <iostream>
+
+
+
+// Используйте эту строку, если поднимаете с помощью docker compose
 // main server http://localhost:8002
-const QString MAIN_SERVER_URL("http://localhost:8002");
+
+// Если вы поднимаете кластер с помощью Minikube, то пропишите в терминале "minikube ip" и вставьте "http://<minikube ip>:30001"
+const QString MAIN_SERVER_URL("http://172.27.181.239:30001");
 
 login_form::login_form(QWidget *parent)
     : QDialog(parent)
@@ -59,7 +65,7 @@ void login_form::on_login_clicked()
             QMessageBox::information(this, "Успех", "Вход выполнен успешно!");
             calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form(m_userlogin);
             calculation_matrix_form->show();
-            this->hide(); // Скрываем окно входа
+            this->close(); // Скрываем окно входа
         }
         else {
             // Ошибка при запросе

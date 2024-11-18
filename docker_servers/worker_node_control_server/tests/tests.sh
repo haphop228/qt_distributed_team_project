@@ -68,3 +68,11 @@ curl -s -X POST "$WORKER_CONTROL_SERVER/print_matrix_by_matrix_name" \
     -d '{
         "matrix_name": "'"$MATRIX_FILE_NAME"'"
     }'
+
+# 5. Test invertible matrix by name
+echo ""
+echo ""
+echo "4. Testing invertible matrix by matrix name..."
+curl -X POST "$WORKER_CONTROL_SERVER/calculate_invertible_matrix_by_matrix_name" \
+-H "Content-Type: application/json" \
+-d '{"matrix_name": "'"$MATRIX_FILE_NAME"'"}'

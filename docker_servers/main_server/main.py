@@ -8,7 +8,7 @@ app = FastAPI()
 # Загрузка конфигураций
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
-
+WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL", default="http://worker-node-control-server:8003")
 # Pydantic модель для регистрации пользователя
 class RegisterCredentials(BaseModel):
     name: str
@@ -24,17 +24,27 @@ class LoginCredentials(BaseModel):
 # Pydantic модель для получения id
 class IdCredentials(BaseModel):
     login: str
+    
+class MatrixName(BaseModel):
+    matrix_name: str
 
 # Функция для проверки доступности серверов
 async def check_server_availability(url: str):
     try:
         async with httpx.AsyncClient() as client:
+            print(f" checking server availability for url:{url}")
             response = await client.get(url)
             if response.status_code == 200:
+                print(f"{url} - available!")
                 return True
     except httpx.RequestError:
         return False
     return False
+
+# Корневой маршрут, добавьте его
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the main server"}
 
 # API для входа пользователя
 @app.post("/login")
@@ -96,16 +106,47 @@ async def get_matrix_names_by_user_login(credentials: IdCredentials):
     
     return response.json()
 
+@app.post("/calculate_invertible_matrix_by_matrix_name")
+async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):
+    matrix_name = credentials.matrix_name
+    print(f'trying to get invertible matrix for matrix with name = {matrix_name}')
+    
+    if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status"):
+        raise HTTPException(status_code=503, detail="MongoDB недоступен")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{WORKER_CONTROL_SERVER_URL}/calculate_invertible_matrix_by_matrix_name", json=credentials.model_dump())
+    
+    if response.status_code != 200:
+        print(f"error in calculations: {response.status_code}")
+        try:
+            error_details = response.json()  # Попытаться распарсить JSON-ответ с ошибкой
+            print(f"Error details: {error_details}")
+        except ValueError:
+            error_details = response.text  # Если не удалось распарсить JSON, выведем текст ошибки
+            print(f"Error details: {error_details}")
+        raise HTTPException(status_code=response.status_code, detail=error_details)
+        
+    print("invertible matrix calculated successfully!")
+    return response.json()
+    
+
+
 @app.get("/status")
 async def get_status():
     # Явное ожидание выполнения check_server_availability
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
-
+    worker_control_server_status = await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status")
+    print(SQLITE_URL, sqlite_status)
+    print(MONGO_SERVER_URL, mongo_server_status)
+    print(WORKER_CONTROL_SERVER_URL, worker_control_server_status)
     return {
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
         "MONGO_SERVER_URL": MONGO_SERVER_URL,
+        "WORKER_CONTROL_SERVER_URL": WORKER_CONTROL_SERVER_URL,
         "sqlite_status": sqlite_status,
-        "mongo_server_status": mongo_server_status
+        "mongo_server_status": mongo_server_status,
+        "worker_control_server_status": worker_control_server_status
     }
