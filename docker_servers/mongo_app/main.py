@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import httpx
 import os
 import tempfile
+from logger import log  # Используем кастомный логгер
 from mongo_service import (
     save_matrix_to_db,
     get_matrix_from_db,
@@ -13,7 +14,7 @@ from mongo_service import (
     list_files_in_db,
     check_mongodb_availability,
 )  # Импортируем функции из mongo_service.py
-from logger import log  # Используем кастомный логгер
+
 
 # Получаем URL из переменных окружения
 SQLITE_URL = os.getenv("SQLITE_URL", "http://localhost:8000")

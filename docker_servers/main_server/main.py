@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import httpx
 import os
-from logger import logger  # Импорт логгера
+from logger import log  # Используем кастомный логгер
 
 app = FastAPI()
 
