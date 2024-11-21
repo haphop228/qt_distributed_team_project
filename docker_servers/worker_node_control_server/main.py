@@ -3,9 +3,13 @@ from fastapi.responses import FileResponse
 import httpx
 import os
 import numpy as np
-from scipy.io import mmread,mmwrite
+from scipy.io import mmread, mmwrite
 from io import BytesIO
 from pydantic import BaseModel
+from logger import get_logger  
+
+# Инициализация логгера
+logger = get_logger("matrix_operations")
 
 app = FastAPI()
 TEMP_DIR = "temp_mtx_files"
@@ -22,9 +26,16 @@ class MatrixRequest(BaseModel):
 async def check_server_availability(url: str):
     try:
         async with httpx.AsyncClient() as client:
+            logger.info(f"Checking server availability for URL: {url}")
             response = await client.get(url)
-            return response.status_code == 200
-    except httpx.RequestError:
+            if response.status_code == 200:
+                logger.info(f"Server {url} is available.")
+                return True
+            else:
+                logger.warning(f"Server {url} responded with status code {response.status_code}.")
+                return False
+    except httpx.RequestError as e:
+        logger.error(f"Failed to check server availability for {url}: {e}")
         return False
     
 def remove_file(file_path: str):
@@ -33,18 +44,19 @@ def remove_file(file_path: str):
     """
     try:
         os.remove(file_path)
-        print(f"Temporary file {file_path} removed.")
+        logger.info(f"Temporary file {file_path} removed.")
     except OSError as e:
-        print(f"Error removing file {file_path}: {e}")
+        logger.error(f"Error removing file {file_path}: {e}")
 
 @app.get("/status")
 async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
+    logger.info("Service status checked.")
     return {
         "status": "running",
-        "SQLITE_URL" : SQLITE_URL,
-        "MONGO_SERVER_URL" : MONGO_SERVER_URL,
+        "SQLITE_URL": SQLITE_URL,
+        "MONGO_SERVER_URL": MONGO_SERVER_URL,
         "sqlite_status": sqlite_status,
         "mongo_server_status": mongo_server_status
     }
@@ -52,14 +64,6 @@ async def get_status():
 def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
     """
     Конвертирует numpy.array в формат Matrix Market (.mtx) и сохраняет в файл.
-
-    Args:
-        matrix (np.ndarray): Матрица в формате numpy.array.
-        file_path (str): Путь к файлу для сохранения в формате .mtx.
-
-    Raises:
-        ValueError: Если входная матрица не двухмерная.
-        IOError: Если не удается сохранить файл.
     """
     if not isinstance(matrix, np.ndarray):
         raise ValueError("Input must be a numpy.ndarray.")
@@ -69,9 +73,10 @@ def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
 
     try:
         mmwrite(file_path, matrix)
-        print(f"Matrix successfully saved in Matrix Market format to {file_path}")
+        logger.info(f"Matrix successfully saved in Matrix Market format to {file_path}")
         return file_path
     except Exception as e:
+        logger.error(f"Failed to write matrix to file: {e}")
         raise IOError(f"Failed to write matrix to file: {e}") from e
 
 @app.post("/get_matrix_by_name")
@@ -82,29 +87,27 @@ async def get_matrix_by_name(matrix_name: str):
     mongo_endpoint = f"{MONGO_SERVER_URL}/send_matrix_by_matrix_name"
     try:
         async with httpx.AsyncClient() as client:
-            print(f"Trying to get matrix {matrix_name} from MongoDB")
+            logger.info(f"Requesting matrix {matrix_name} from MongoDB at {mongo_endpoint}")
             response = await client.get(mongo_endpoint, params={"matrix_name": matrix_name})
             if response.status_code == 200:
+                logger.info(f"Matrix {matrix_name} retrieved successfully from MongoDB.")
                 matrix_data = response.content
-                # Конвертируем данные из Matrix Market в numpy.array
                 try:
                     matrix = mmread(BytesIO(matrix_data))
-                    # Проверяем, является ли матрица разреженной (если да, преобразуем в плотную)
                     if isinstance(matrix, np.ndarray):
-                        print("Matrix is already a dense numpy array")
+                        logger.info("Matrix is already a dense numpy array.")
                     else:
-                        print("Matrix is sparse, converting to dense numpy array")
-                        matrix = matrix.toarray()  # Преобразуем разреженную матрицу в плотную
-                    print("Matrix converted to np.array")
+                        logger.info("Matrix is sparse, converting to dense numpy array.")
+                        matrix = matrix.toarray()
                     return matrix
                 except Exception as e:
-                    print(f"Failed to parse the matrix file (mtx -> np array): {e}")
+                    logger.error(f"Failed to parse the matrix file: {e}")
                     raise HTTPException(status_code=500, detail=f"Failed to parse the matrix file: {e}") from e
             else:
-                print("Matrix not found on MongoDB server")
+                logger.warning(f"Matrix not found on MongoDB server: {response.status_code}")
                 raise HTTPException(status_code=response.status_code, detail="Matrix not found on MongoDB server")
     except httpx.RequestError as e:
-        print("Failed to connect to MongoDB server")
+        logger.error(f"Failed to connect to MongoDB server: {e}")
         raise HTTPException(status_code=500, detail="Failed to connect to MongoDB server") from e
 
 @app.post("/print_matrix_by_matrix_name")
@@ -114,93 +117,54 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     """
     matrix_name = request.matrix_name
     try:
-        # Получаем матрицу в формате numpy.array
         matrix = await get_matrix_by_name(matrix_name)
-        print(f"Matrix '{matrix_name}':\n", np.round(matrix, 1))  # Округляем до 1 знака после запятой
+        logger.info(f"Matrix '{matrix_name}':\n{np.round(matrix, 1)}")
         return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}
     except HTTPException as e:
+        logger.error(f"HTTP error while printing matrix: {e.detail}")
         raise e
     except Exception as e:
+        logger.error(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}") from e
-    
+
 def calculate_invertible_matrix(matrix: np.array) -> np.array:
     """
     Вычисляет обратную матрицу для заданной матрицы.
-    
-    :param matrix: Входная матрица в формате numpy.array.
-    :return: Обратная матрица в формате numpy.array.
-    :raises ValueError: Если матрица не квадратная или необратимая.
     """
-    print(f'Trying to get invertible with np.linalg.inv')
-    # Проверка на квадратную форму
+    logger.info("Calculating inverse matrix.")
     if matrix.shape[0] != matrix.shape[1]:
-        print("Matrix must be square to calculate its inverse")
+        logger.error("Matrix must be square to calculate its inverse.")
         raise ValueError("Matrix must be square to calculate its inverse.")
 
-    # Проверка на необратимость
     determinant = np.linalg.det(matrix)
     if determinant == 0:
-        print("Matrix is not invertible (determinant is zero).")
+        logger.error("Matrix is not invertible (determinant is zero).")
         raise ValueError("Matrix is not invertible (determinant is zero).")
     
-    # Вычисление обратной матрицы
     inverse_matrix = np.linalg.inv(matrix)
+    logger.info("Inverse matrix calculated successfully.")
     return inverse_matrix
 
 @app.post("/calculate_invertible_matrix_by_matrix_name")
 async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
     """
     Вычисляет и возвращает обратную матрицу по имени матрицы.
-    
-    Args:
-        request (MatrixRequest): Объект, содержащий имя матрицы (matrix_name).
-    
-    Returns:
-        dict: Оригинальная и обратная матрица в виде списков (для JSON-сериализации).
-        
-    запрос POST:
-    -H "Content-Type: application/json" -d '{"matrix_name": "Matrix_FIDAP005.mtx"}'
-
-    Ответ сервера:
-    
-        "original_matrix": [
-            [2, 1],
-            [5, 3]
-        ],
-        "inverse_matrix": [
-            [3.0, -1.0],
-            [-5.0, 2.0]
-        ]
-    
-    \nОтвет при ошибке:\n
-    {
-    "detail": "Failed to fetch the matrix: Matrix not found on MongoDB server"
-    }
-    
-    {
-    "detail": "Matrix is not invertible (determinant is zero)."
-    }
     """
     matrix_name = request.matrix_name
-    # Получение матрицы по имени
     try:
-        print(f"Trying to get {matrix_name} with await get_matrix_by_name")
-        matrix = await get_matrix_by_name(matrix_name)  # Возвращает матрицу как np.array
+        matrix = await get_matrix_by_name(matrix_name)
     except HTTPException as e:
-        print(f"error in getting matrix from MONGO : {e, e.detail}")
+        logger.error(f"Error fetching matrix: {e.detail}")
         raise HTTPException(status_code=e.status_code, detail=f"Failed to fetch the matrix: {e.detail}")
 
-    # Вычисление обратной матрицы
     try:
-        print(f"Trying to get matrix^-1 with calculate_invertible_matrix")
         inverse_matrix = calculate_invertible_matrix(matrix)
     except ValueError as e:
-        print(f"error in np.linalg.inv = {str(e)}")
+        logger.error(f"Matrix inversion error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    print("matrix^-1 computed successfully!")
-    # Возвращение результата в формате JSON (списки для сериализации)
+
+    logger.info("Matrix inversion completed.")
     return {
         "original_matrix": matrix.tolist(),
         "inverse_matrix": inverse_matrix.tolist()
     }
-    
