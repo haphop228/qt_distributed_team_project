@@ -33,58 +33,58 @@ class MatrixName(BaseModel):
 # Функция для проверки доступности серверов
 async def check_server_availability(url: str):
     try:
-        logger.info(f"Checking server availability: {url}")
+        log(f"Checking server availability: {url}")
         async with httpx.AsyncClient() as client:
             response = await client.get(url)
             if response.status_code == 200:
-                logger.info(f"Server available: {url}")
+                log(f"Server available: {url}")
                 return True
     except httpx.RequestError as e:
-        logger.error(f"Request error while checking {url}: {e}")
+        log(f"Request error while checking {url}: {e}", level="error")
     return False
 
 # API для входа пользователя
 @app.post("/login")
 async def login_user(credentials: LoginCredentials):
-    logger.info(f"User login attempt: {credentials.login}")
+    log(f"User login attempt: {credentials.login}")
     if not await check_server_availability(f"{SQLITE_URL}/status"):
-        logger.error(f"SQLite server unavailable: {SQLITE_URL}/status")
+        log(f"SQLite server unavailable: {SQLITE_URL}/status", level="error")
         raise HTTPException(status_code=503, detail="SQLite сервер недоступен")
 
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{SQLITE_URL}/login", json=credentials.dict())
 
     if response.status_code != 200:
-        logger.warning(f"Login failed for user {credentials.login}: {response.text}")
+        log(f"Login failed for user {credentials.login}: {response.text}", level="error")
         raise HTTPException(status_code=response.status_code, detail="Ошибка входа")
 
-    logger.info(f"User {credentials.login} logged in successfully.")
+    log(f"User {credentials.login} logged in successfully.")
     return response.json()
 
 # API для регистрации пользователя
 @app.post("/register")
 async def register(credentials: RegisterCredentials):
-    logger.info(f"User registration attempt: {credentials.login}")
+    log(f"User registration attempt: {credentials.login}")
     if not await check_server_availability(f"{SQLITE_URL}/status"):
-        logger.error(f"SQLite server unavailable: {SQLITE_URL}/status")
+        log(f"SQLite server unavailable: {SQLITE_URL}/status", level="error")
         raise HTTPException(status_code=503, detail="SQLite сервер недоступен")
 
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{SQLITE_URL}/register", json=credentials.model_dump())
 
     if response.status_code != 200:
-        logger.warning(f"Registration failed for user {credentials.login}: {response.text}")
+        log(f"Registration failed for user {credentials.login}: {response.text}", level="error")
         raise HTTPException(status_code=response.status_code, detail="Ошибка регистрации")
 
-    logger.info(f"User {credentials.login} registered successfully.")
+    log(f"User {credentials.login} registered successfully.")
     return response.json()
 
 # API для сохранения матрицы
 @app.post("/save_matrix")
 async def save_matrix(login: str = Form(...), matrix_file: UploadFile = File(...)):
-    logger.info(f"Saving matrix {matrix_file.filename} for user {login}")
+    log(f"Saving matrix {matrix_file.filename} for user {login}")
     if not await check_server_availability(f"{MONGO_SERVER_URL}/status"):
-        logger.error(f"MongoDB server unavailable: {MONGO_SERVER_URL}/status")
+        log(f"MongoDB server unavailable: {MONGO_SERVER_URL}/status", level="error")
         raise HTTPException(status_code=503, detail="MongoDB сервер недоступен")
 
     async with httpx.AsyncClient() as client:
@@ -93,38 +93,38 @@ async def save_matrix(login: str = Form(...), matrix_file: UploadFile = File(...
         response = await client.post(f"{MONGO_SERVER_URL}/save_matrix", data=data, files=files)
 
     if response.status_code != 200:
-        logger.warning(f"Matrix save failed for user {login}: {response.text}")
+        log(f"Matrix save failed for user {login}: {response.text}", level="error")
         raise HTTPException(status_code=response.status_code, detail="Ошибка при сохранении матрицы")
 
-    logger.info(f"Matrix {matrix_file.filename} saved successfully for user {login}.")
+    log(f"Matrix {matrix_file.filename} saved successfully for user {login}.")
     return response.json()
 
 # API для получения списка матриц
 @app.post("/get_matrix_names_by_user_login")
 async def get_matrix_names_by_user_login(credentials: IdCredentials):
-    logger.info(f"Fetching matrix list for user {credentials.login}")
+    log(f"Fetching matrix list for user {credentials.login}")
     if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{SQLITE_URL}/status"):
-        logger.error(f"One or more servers unavailable: {MONGO_SERVER_URL}, {SQLITE_URL}")
+        log(f"One or more servers unavailable: {MONGO_SERVER_URL}, {SQLITE_URL}", level="error")
         raise HTTPException(status_code=503, detail="Один из серверов недоступен")
 
     async with httpx.AsyncClient() as client:
         response = await client.post(f"{MONGO_SERVER_URL}/get_matrix_names_by_user_login", json=credentials.model_dump())
 
     if response.status_code != 200:
-        logger.warning(f"Failed to fetch matrices for user {credentials.login}: {response.text}")
+        log(f"Failed to fetch matrices for user {credentials.login}: {response.text}", level="error")
         raise HTTPException(status_code=response.status_code, detail="Ошибка при получении списка матриц")
 
-    logger.info(f"Matrices for user {credentials.login} fetched successfully.")
+    log(f"Matrices for user {credentials.login} fetched successfully.")
     return response.json()
 
 # API для вычисления обратимой матрицы
 @app.post("/calculate_invertible_matrix_by_matrix_name")
 async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):
     matrix_name = credentials.matrix_name
-    logger.info(f"Calculating invertible matrix for {matrix_name}")
+    log(f"Calculating invertible matrix for {matrix_name}")
 
     if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status"):
-        logger.error(f"Required servers unavailable: {MONGO_SERVER_URL}, {WORKER_CONTROL_SERVER_URL}")
+        log(f"Required servers unavailable: {MONGO_SERVER_URL}, {WORKER_CONTROL_SERVER_URL}", level="error")
         raise HTTPException(status_code=503, detail="Необходимые серверы недоступны")
 
     async with httpx.AsyncClient() as client:
@@ -132,21 +132,21 @@ async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):
 
     if response.status_code != 200:
         error_details = response.json() if response.headers.get("content-type") == "application/json" else response.text
-        logger.error(f"Calculation failed for {matrix_name}: {error_details}")
+        log(f"Calculation failed for {matrix_name}: {error_details}", level="error")
         raise HTTPException(status_code=response.status_code, detail=error_details)
 
-    logger.info(f"Invertible matrix for {matrix_name} calculated successfully.")
+    log(f"Invertible matrix for {matrix_name} calculated successfully.")
     return response.json()
 
 # API для получения статуса
 @app.get("/status")
 async def get_status():
-    logger.info("Fetching server status")
+    log("Fetching server status")
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
     worker_control_server_status = await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status")
 
-    logger.info(f"Server statuses: SQLite={sqlite_status}, MongoDB={mongo_server_status}, WorkerControl={worker_control_server_status}")
+    log(f"Server statuses: SQLite={sqlite_status}, MongoDB={mongo_server_status}, WorkerControl={worker_control_server_status}")
     return {
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
