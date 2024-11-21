@@ -92,9 +92,24 @@ async def save_matrix(
         matrix_content = await matrix_file.read()
         filename = os.path.basename(matrix_file.filename)
 
-        await save_matrix_to_db(user_id=user_id, matrix_name=filename, matrix_content=matrix_content)
+        result = await save_matrix_to_db(
+            user_id=user_id,
+            matrix_name=filename,
+            matrix_content=matrix_content,
+        )
+        log(f"{result}")
+        if result["message"] == "Matrix already exists, linked with new user_id and filename":
+            log(f"Matrix '{filename}' already exists in DB, it has the same filename")
+            return {
+                "message": "Matrix already exists, linked with new user_id and filename",
+                "existing_filename": result["existing_filename"],
+                "matrix_name": filename,
+                "hash": result['current_matrix_hash'],
+                "user_id": user_id,
+            }
+
         log(f"Matrix '{filename}' saved for user_id {user_id}, login {login}")
-        return {"message": "Matrix saved successfully", "user_id": user_id}
+        return {"message": result["message"], "user_id": result['user_id'], "filename": result['matrix_name']}
 
     except HTTPException as e:
         log(f"HTTP error during matrix save: {e.detail}", level="error")
@@ -102,6 +117,8 @@ async def save_matrix(
     except Exception as e:
         log(f"Unexpected error during matrix save: {e}", level="error")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+
 
 @app.get("/get_matrix_by_user_id/{user_id}")
 async def get_matrices_by_user_id(user_id: int):
