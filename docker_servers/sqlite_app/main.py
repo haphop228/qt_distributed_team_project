@@ -45,7 +45,7 @@ async def login_user(credentials: LoginCredentials, db: Session = Depends(sq.get
     logger.info(f"Login attempt for user: {credentials.login}")
     try:
         user = sq.get_user_by_login(db, credentials.login)
-        if user and bcrypt.checkpw(credentials.password.encode(), user.password.encode()):
+        if credentials.password == user.password:
             logger.info(f"Login successful for user ID: {user.id}")
             return {"message": "Login successful", "user_id": user.id}
         else:

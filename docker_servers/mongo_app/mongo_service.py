@@ -68,6 +68,7 @@ async def save_matrix_to_db(user_id: int, matrix_name: str, matrix_content: byte
         # Линкуем новое имя и user_id, не записывая данные заново
         try:
             # Привязка нового user_id и имени к существующему хэшу
+            # TODO : не работает (создается новый чанк в любом случае)
             grid_fs.put(matrix_content, user_id=user_id, filename=matrix_name, hash=matrix_hash)
 
             log(f"Matrix '{matrix_name}' linked to existing matrix with hash '{matrix_hash}' successfully")
