@@ -8,7 +8,7 @@ app = FastAPI()
 # Загрузка конфигураций
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
-WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL", default="http://worker-node-control-server:8003")
+WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL")
 # Pydantic модель для регистрации пользователя
 class RegisterCredentials(BaseModel):
     name: str
