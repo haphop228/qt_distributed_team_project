@@ -1,13 +1,13 @@
 #!/bin/bash
 # cd docker_servers/mongo_app/tests
-MONGO_VOLUME_PATH="/Users/alicee/Desktop/Work_Main/docker_test/docker_servers/db_mongo"
-SQLITE_VOLUME_PATH="/Users/alicee/Desktop/Work_Main/docker_test/docker_servers/db_sqlite"
+MONGO_VOLUME_PATH="/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_mongo"
+SQLITE_VOLUME_PATH="/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_sqlite"
 DOCKER_IMAGE_NAME="my_fastapi_app"
 MONGO_IMAGE_NAME="mongo_server"
 DOCKER_CONTAINER_NAME="fastapi_app_container"
 MONGO_CONTAINER_NAME="mongo_container"
 NETWORK_NAME="my_app_network"
-MATRIX_FILE="Matrix_JGL009.mtx" 
+MATRIX_FILE="100x100_matrix_26KB.mtx" 
 
 # # 1. Создаем пользовательскую сеть для взаимодействия контейнеров
 # echo "Создаем сеть $NETWORK_NAME..."

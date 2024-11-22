@@ -55,8 +55,8 @@ def load_matrix_from_mtx(filename):
 
 def main():
     # Параметры матрицы
-    rows = 4  # Количество строк
-    cols = 4  # Количество столбцов
+    rows = 100  # Количество строк
+    cols = 100  # Количество столбцов
     density = 0.9  # Плотность матрицы (10% ненулевых элементов)
     matrix_name = "docker_servers/main_server/tests/" + "generated_integer_matrix" + str(np.random.randint(1, 10000)) + ".mtx"  # Имя файла для сохранения
     min_val = 1  # Минимальное значение для чисел в матрице

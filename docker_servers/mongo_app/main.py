@@ -98,13 +98,14 @@ async def save_matrix(
             matrix_content=matrix_content,
         )
         log(f"{result}")
-        if result["message"] == "Matrix already exists, linked with new user_id and filename":
+        if result["message"] == "Matrix already exists, linked with new metadata":
             log(f"Matrix '{filename}' already exists in DB, it has the same filename")
+            log(f'{result}')
             return {
                 "message": "Matrix already exists, linked with new user_id and filename",
                 "existing_filename": result["existing_filename"],
                 "matrix_name": filename,
-                "hash": result['current_matrix_hash'],
+                "hash": result['existing_matrix_hash'],
                 "user_id": user_id,
             }
 
@@ -120,7 +121,7 @@ async def save_matrix(
 
 
 
-@app.get("/get_matrix_by_user_id/{user_id}")
+@app.get("/get_matrices_by_user_id/{user_id}")
 async def get_matrices_by_user_id(user_id: int):
     log(f"Fetching matrices for user_id: {user_id}")
     matrices = await find_matrices_by_user_id(user_id)
@@ -130,8 +131,8 @@ async def get_matrices_by_user_id(user_id: int):
     log(f"Matrices found for user_id {user_id}: {matrices}")
     return {"matrices": matrices}
 
-@app.post("/get_matrix_names_by_user_login")
-async def get_matrix_names_by_user_login(credentials: UserInput):
+@app.post("/get_matrices_by_user_login")
+async def get_matrices_by_user_login(credentials: UserInput):
     user_id = await get_user_id(credentials)
     log(f"Fetching matrices for login: {credentials.login}, user_id: {user_id}")
     matrices = await find_matrices_by_user_id(user_id)
@@ -166,8 +167,8 @@ async def get_matrix_by_matrix_id(file_id: str):
     log(f"Matrix with file_id {file_id} sent as file: {temp_file_path}")
     return FileResponse(temp_file_path, media_type="application/octet-stream", filename=f"{file_id}.mtx")
 
-@app.get("/send_matrix_by_matrix_name")
-async def send_matrix_by_matrix_name(matrix_name: str):
+@app.get("/get_matrix_by_matrix_name")
+async def get_matrix_by_matrix_name(matrix_name: str):
     log(f"Fetching matrix by name: {matrix_name}")
     matrix = await find_matrix_by_filename(matrix_name)
     if not matrix:
