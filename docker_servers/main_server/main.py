@@ -100,15 +100,15 @@ async def save_matrix(login: str = Form(...), matrix_file: UploadFile = File(...
     return response.json()
 
 # API для получения списка матриц
-@app.post("/get_matrix_names_by_user_login")
-async def get_matrix_names_by_user_login(credentials: IdCredentials):
+@app.post("/get_matrices_by_user_login")
+async def get_matrices_by_user_login(credentials: IdCredentials):
     log(f"Fetching matrix list for user {credentials.login}")
     if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{SQLITE_URL}/status"):
         log(f"One or more servers unavailable: {MONGO_SERVER_URL}, {SQLITE_URL}", level="error")
         raise HTTPException(status_code=503, detail="Один из серверов недоступен")
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(f"{MONGO_SERVER_URL}/get_matrix_names_by_user_login", json=credentials.model_dump())
+        response = await client.post(f"{MONGO_SERVER_URL}/get_matrices_by_user_login", json=credentials.model_dump())
 
     if response.status_code != 200:
         log(f"Failed to fetch matrices for user {credentials.login}: {response.text}", level="error")

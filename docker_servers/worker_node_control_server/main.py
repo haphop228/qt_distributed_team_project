@@ -81,7 +81,7 @@ async def get_matrix_by_name(matrix_name: str):
     """
     Получение матрицы по имени с MongoDB сервера и конвертация в numpy.array.
     """
-    mongo_endpoint = f"{MONGO_SERVER_URL}/send_matrix_by_matrix_name"
+    mongo_endpoint = f"{MONGO_SERVER_URL}/get_matrix_by_matrix_name"
     try:
         async with httpx.AsyncClient() as client:
             log(f"Requesting matrix {matrix_name} from MongoDB at {mongo_endpoint}")
