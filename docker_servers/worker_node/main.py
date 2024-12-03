@@ -35,3 +35,8 @@ async def get_status():
     }
     
     
+#process_task
+# 'input_matrix': [ [ 1,2 ] , [3, 4] ],
+# 'algorithm': 'lu',
+# 'result': [ [ [ 3, 1] , [ 3, 3] ] , [ [1,2],[3,2] ] ]
+# 'time_taken": 3.123

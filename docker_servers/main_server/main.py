@@ -117,6 +117,27 @@ async def get_matrices_by_user_login(credentials: IdCredentials):
     log(f"Matrices for user {credentials.login} fetched successfully.")
     return response.json()
 
+# API для разложений матрицы
+@app.post("/calculate_all_decompositions_of_matrix_by_matrix_name")
+async def calculate_all_decompositions_of_matrix_by_matrix_name(credentials: MatrixName):
+    matrix_name = credentials.matrix_name
+    log(f"Calculating all decompositions matrix for {matrix_name}")
+
+    if not await check_server_availability(f"{MONGO_SERVER_URL}/status") or not await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status"):
+        log(f"Required servers unavailable: {MONGO_SERVER_URL}, {WORKER_CONTROL_SERVER_URL}", level="error")
+        raise HTTPException(status_code=503, detail="Необходимые серверы недоступны")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{WORKER_CONTROL_SERVER_URL}/calculate_all_decompositions_of_matrix_by_matrix_name", json=credentials.model_dump())
+
+    if response.status_code != 200:
+        error_details = response.json() if response.headers.get("content-type") == "application/json" else response.text
+        log(f"Calculation failed for {matrix_name}: {error_details}", level="error")
+        raise HTTPException(status_code=response.status_code, detail=error_details)
+
+    log(f"all decompositions matrix for {matrix_name} calculated successfully.")
+    return response.json()
+
 # API для вычисления обратимой матрицы
 @app.post("/calculate_invertible_matrix_by_matrix_name")
 async def calculate_invertible_matrix_by_matrix_name(credentials: MatrixName):

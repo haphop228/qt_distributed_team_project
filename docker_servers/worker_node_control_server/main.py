@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
+
 import httpx
 import os
 import numpy as np
@@ -20,6 +21,11 @@ WORKER_NODE_1_URL = os.getenv("WORKER_NODE_1_URL")
 WORKER_NODE_2_URL = os.getenv("WORKER_NODE_2_URL")
 WORKER_NODE_3_URL = os.getenv("WORKER_NODE_3_URL")
 
+WORKER_NODE_URLS = {
+    "WORKER_NODE_1": [WORKER_NODE_1_URL, 'LU'],
+    "WORKER_NODE_2": [WORKER_NODE_2_URL, 'QR'],
+    "WORKER_NODE_3": [WORKER_NODE_3_URL, 'LDL'],
+}
 
 class MatrixRequest(BaseModel):
     matrix_name: str
@@ -137,6 +143,147 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     except Exception as e:
         log(f"Unexpected error: {e}", level="error")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}") from e
+    
+
+async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
+    """
+    Отправляет матрицу на обработку воркер-нодам с учетом указанного алгоритма.
+
+    :param matrix: Матрица для обработки.
+    :param destination: Словарь с информацией о нодах и алгоритмах:
+        {
+            "WORKER_NODE_1": [WORKER_NODE_1_URL, 'LU'],
+            "WORKER_NODE_2": [WORKER_NODE_2_URL, 'QR'],
+            "WORKER_NODE_3": [WORKER_NODE_3_URL, 'LDL'],
+        }
+    :return: Словарь с ответами от нод или ошибками.
+    """
+    responses = {}
+    log("Starting task distribution to worker nodes.", level="info")
+
+    async with httpx.AsyncClient() as client:
+        tasks = []
+
+        for worker_name, (worker_url, algorithm) in destination.items():
+            if not worker_url:
+                log(f"URL for {worker_name} is not defined.", level="error")
+                responses[worker_name] = {"error": f"URL for {worker_name} is not defined."}
+                continue
+
+            # Подготовка данных для отправки
+            data_to_send = {
+                "matrix": matrix.tolist(),  # Преобразуем матрицу в список для передачи через JSON
+                "algorithm": algorithm,    # Алгоритм обработки (LU, QR, LDL и т.д.)
+            }
+            log(f"Preparing to send matrix to {worker_name} at {worker_url} using algorithm {algorithm}.", level="info")
+
+            # Создание задачи отправки POST-запроса
+            task = client.post(f"{worker_url}/process_task", json=data_to_send)
+            tasks.append((worker_name, task))
+
+        # Выполнение всех запросов
+        for worker_name, task in tasks:
+            try:
+                response = await task
+                if response.status_code == 200:
+                    log(f"Successfully sent matrix to {worker_name}. Response: {response.json()}", level="info")
+                    responses[worker_name] = response.json()
+                else:
+                    log(f"Failed to process matrix on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
+                    responses[worker_name] = {"error": f"HTTP {response.status_code}: {response.text}"}
+            except Exception as e:
+                log(f"Failed to connect to {worker_name} at {destination[worker_name][0]}: {e}", level="error")
+                responses[worker_name] = {"error": str(e)}
+
+    log("Task distribution to worker nodes completed.", level="info")
+    return responses
+
+
+def process_response(response: dict) -> dict:
+    """
+    Обрабатывает и форматирует ответ от воркер-нод.
+
+    :param response: Словарь с информацией от функции send_task_to_worker_nodes.
+    :return: Словарь, готовый для отправки в качестве JSON-ответа.
+    """
+    log("Processing responses from worker nodes.", level="info")
+    formatted_responses = {}
+
+    for worker, result in response.items():
+        if "error" in result:
+            # Если произошла ошибка, логируем и добавляем в итоговый словарь
+            log(f"Worker {worker} reported an error: {result['error']}", level="error")
+            formatted_responses[worker] = {
+                "status": "error",
+                "message": result["error"]
+            }
+        else:
+            # Обрабатываем успешный результат
+            log(f"Processing successful response from {worker}.", level="info")
+            input_matrix = result.get("input_matrix", [])
+            algorithm = result.get("algorithm", "unknown")
+            computed_result = result.get("result", [])
+            time_taken = result.get("time_taken", "unknown")
+
+            log(f"Worker {worker} used algorithm '{algorithm}' and completed in {time_taken} seconds.", level="info")
+            
+            formatted_responses[worker] = {
+                "status": "success",
+                "algorithm": algorithm,
+                "time_taken": time_taken,
+                "result": computed_result
+            }
+
+            # Форматируем красивый вывод в консоль
+            print("\n" + "-" * 50)
+            print(f"WORKER: {worker}")
+            print(f"Algorithm: {algorithm}")
+            print(f"Time Taken: {time_taken} seconds")
+            print("Input Matrix:")
+            for row in input_matrix:
+                print(row)
+            print("\nResult:")
+            for block in computed_result:
+                print("Block:")
+                for row in block:
+                    print(row)
+            print("-" * 50)
+
+    log("Responses processing completed.", level="info")
+    return formatted_responses
+
+# MAIN METHOD
+@app.post("/calculate_all_decompositions_of_matrix_by_matrix_name")
+async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
+    """
+    Вычисляет и возвращает все разложения матрицы по имени матрицы.
+    """
+    matrix_name = request.matrix_name
+    try:
+        matrix = await get_matrix_by_name(matrix_name)
+    except HTTPException as e:
+        log(f"Error fetching matrix: {e.detail}", level="error")
+        raise HTTPException(status_code=e.status_code, detail=f"Failed to fetch the matrix: {e.detail}")
+
+    try:
+        log('Sending matrix to worker nodes')
+        result = send_task_to_worker_nodes(matrix, WORKER_NODE_URLS)
+    except ValueError as e:
+        log(f"Matrix inversion error: {e}", level="error")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        log('Making result beautiful!')
+        final_result = process_response(response=result)
+    except Exception as e:
+        log(f"Error on worker node : {e}")
+        
+        
+    log("Matrix inversion completed.")
+    
+    return final_result
+
+
 
 def calculate_invertible_matrix(matrix: np.array) -> np.array:
     """
@@ -152,9 +299,11 @@ def calculate_invertible_matrix(matrix: np.array) -> np.array:
         log("Matrix is not invertible (determinant is zero).", level="error")
         raise ValueError("Matrix is not invertible (determinant is zero).")
     
+    
     inverse_matrix = np.linalg.inv(matrix)
     log("Inverse matrix calculated successfully.")
     return inverse_matrix
+
 
 @app.post("/calculate_invertible_matrix_by_matrix_name")
 async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
