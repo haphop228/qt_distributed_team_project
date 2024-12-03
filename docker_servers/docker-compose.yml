@@ -47,6 +47,17 @@ services:
     networks:
       - app-network
 
+  worker-node:
+    build: ./worker_node
+    ports:
+      - "8004:8000"
+    env_file:
+      - ./configs/config_worker_node.env
+    depends_on:
+      - worker-node-control-server
+    networks:
+      - app-network
+
   main-server:
     build: ./main_server
     ports:
@@ -58,8 +69,11 @@ services:
       - sqlite-fastapi-server
       - mongo-fastapi-server
       - worker-node-control-server
+      - worker-node
     networks:
       - app-network
+
+
 
   # mongodb:
   #   image: mongo:latest
@@ -107,6 +121,17 @@ services:
   #     - mongo-fastapi-server
   #   networks:
   #     - app-network
+  #
+  # worker-node:
+  #   image: alice3e/worker_node:latest
+  #   ports:
+  #     - "8004:8000"
+  #   env_file:
+  #     - ./configs/config_worker_node.env
+  #   depends_on:
+  #     - worker-node-control-server
+  #   networks:
+  #     - app-network
 
   # main-server:
   #   image: alice3e/main_server:latest
@@ -119,6 +144,7 @@ services:
   #     - sqlite-fastapi-server
   #     - mongo-fastapi-server
   #     - worker-node-control-server
+  #     - worker-node
   #   networks:
   #     - app-network
 

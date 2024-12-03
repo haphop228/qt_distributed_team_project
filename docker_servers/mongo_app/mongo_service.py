@@ -4,7 +4,7 @@ from gridfs import GridFS
 from logger import log  # Импортируем логгер
 import hashlib
 from datetime import datetime, timezone
-
+from bson.objectid import ObjectId  # Импорт для работы с ObjectId
 
 # Получаем URL MongoDB из переменной окружения
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
@@ -54,9 +54,7 @@ async def find_matrix_by_hash(matrix_hash: str):
         matrix = grid_fs.find_one({"hash": matrix_hash})
         if matrix:
             log(f"Matrix with hash '{matrix_hash}' found")
-            # Получаем корректное содержимое документа через get_correct_document
-            file_data = await get_correct_document(matrix)
-            return file_data  # Возвращаем содержимое файла
+            return matrix  # Возвращаем содержимое файла
         else:
             log(f"Matrix with hash '{matrix_hash}' not found")
             return None
@@ -91,24 +89,26 @@ async def get_correct_document(document):
     Если документ является ссылкой на оригинальный файл (is_original=False), 
     ищем оригинальный файл по id_of_original_matrix и возвращаем его содержимое.
     """
+    
     try:
-        log(f"Getting correct document for filename '{document.filename}'")
+        log(f"document : {document}, type : {type(document)}")
+        log(f"Getting correct document for filename '{document['filename']}'")
         
         # Если это оригинальный файл
-        if document.is_original:
-            log(f"Document '{document.filename}' is the original file.")
-            file_id = document._id  # ID файла текущего документа
+        if document['is_original']:
+            log(f"Document '{document['filename']}' is the original file.")
+            file_id = document['_id']  # ID файла текущего документа
             file_data = grid_fs.get(file_id).read()  # Чтение содержимого файла
             log(f"File with ID {file_id} successfully retrieved from GridFS.")
             return file_data
         
         # Если это ссылка на оригинальный файл
         else:
-            log(f"Document '{document.filename}' is a reference to another file.")
-            original_file_id = document.id_of_original_matrix  # Получаем ID оригинальной матрицы
-            log(f"Searching for original file with ID {original_file_id}.")
+            log(f"Document '{document['filename']}' is a reference to another file.")
+            original_file_id = document['id_of_original_matrix']  # Получаем ID оригинальной матрицы
+            log(f"Searching for original file with ID {original_file_id}. type : {original_file_id}")
             
-            original_document = await db.fs.files.find_one({"_id": original_file_id})  # Находим оригинальный документ
+            original_document = db.fs.files.find_one({"_id": ObjectId(original_file_id)})
             if original_document:
                 log(f"Original file with ID {original_file_id} found. Fetching it from GridFS.")
                 # Получаем содержимое оригинального файла
@@ -120,7 +120,7 @@ async def get_correct_document(document):
                 raise ValueError(f"Original file with ID {original_file_id} not found.")
     
     except Exception as e:
-        log(f"Error in get_correct_document for document '{document.filename}': {e}", level="error")
+        log(f"Error in get_correct_document for document '{document['filename']}': {e}", level="error")
         raise
 
 
@@ -210,13 +210,17 @@ async def find_matrices_by_user_id(user_id: int):
     """
     log(f"Fetching matrices for user_id {user_id}")
     try:
+        # Получаем все матрицы для данного user_id
+        matrices_cursor = db.fs.files.find({"user_id": user_id})
+        matrices_list = matrices_cursor.to_list(length=None)  # Преобразуем курсор в список
+        
         matrices = []
-        async for matrix in db.fs.files.find({"user_id": user_id}):
+        for matrix in matrices_list:
             matrix_data = await get_correct_document(matrix)
             matrices.append({
                 "file_id": str(matrix["_id"]),
                 "filename": matrix["filename"],
-                "matrix_data": matrix_data
+                #"matrix_data": matrix_data
             })
         
         if matrices:
@@ -228,6 +232,7 @@ async def find_matrices_by_user_id(user_id: int):
     except Exception as e:
         log(f"Error fetching matrices for user_id {user_id}: {e}", level="error")
         raise
+
 
 async def find_matrix_by_filename(filename: str):
     """

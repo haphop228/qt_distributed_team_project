@@ -103,13 +103,10 @@ curl -X POST "http://localhost:8001/save_matrix" \
 echo -e "\n\nTest: testing connection from Mongo_server to Mongo_db"
 curl -X GET "http://localhost:8001/list_files"
 
-# Тест /get_matrix_by_user_id
-echo -e "\n\nTest: /get_matrix_by_user_id"
+# Тест /get_matrices_by_user_login
+echo -e "\n\nTest: /get_matrices_by_user_login"
 curl -X GET "http://localhost:8001/get_matrix_by_user_id/1"
 
-# Тест /get_matrix_by_filename
-echo -e "\n\nTest: /get_matrix_by_filename"
-curl -X GET "http://localhost:8001/get_matrix_by_filename/Matrix_JGL009.mtx"
 
 # # # Очищаем ресурсы после тестов
 echo ""

@@ -83,10 +83,11 @@ curl -s -X POST "$MAIN_SERVER_URL/save_matrix" \
 echo ""
 echo ""
 echo "4. Testing retrieval of matrix list for user..."
-curl -s -X POST "$MAIN_SERVER_URL/get_matrix_names_by_user_login" \
+curl -s -X POST "$MAIN_SERVER_URL/get_matrices_by_user_login" \
     -H "Content-Type: application/json" \
     -d "{\"login\": \"$USER_LOGIN\"}"
     #| grep -q "$MATRIX_FILE_NAME"
+    
 #print_result $? "Retrieve matrix list"
 
 # 5. Test invertible matrix by name
