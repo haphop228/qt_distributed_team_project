@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
+
 import httpx
 import os
 import numpy as np
-from scipy.io import mmread,mmwrite
+from scipy.io import mmread, mmwrite
 from io import BytesIO
 from pydantic import BaseModel
+from logger import log  # Используем кастомный логгер
 
 app = FastAPI()
 TEMP_DIR = "temp_mtx_files"
@@ -15,6 +17,16 @@ SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
 MAIN_SERVER_URL = os.getenv("MAIN_SERVER_URL")
 
+WORKER_NODE_1_URL = os.getenv("WORKER_NODE_1_URL")
+WORKER_NODE_2_URL = os.getenv("WORKER_NODE_2_URL")
+WORKER_NODE_3_URL = os.getenv("WORKER_NODE_3_URL")
+
+WORKER_NODE_URLS = {
+    "WORKER_NODE_1": [WORKER_NODE_1_URL, 'LU'],
+    "WORKER_NODE_2": [WORKER_NODE_2_URL, 'QR'],
+    "WORKER_NODE_3": [WORKER_NODE_3_URL, 'LDL'],
+}
+
 class MatrixRequest(BaseModel):
     matrix_name: str
 
@@ -22,9 +34,16 @@ class MatrixRequest(BaseModel):
 async def check_server_availability(url: str):
     try:
         async with httpx.AsyncClient() as client:
+            log(f"Checking server availability for URL: {url}")
             response = await client.get(url)
-            return response.status_code == 200
-    except httpx.RequestError:
+            if response.status_code == 200:
+                log(f"Server {url} is available.")
+                return True
+            else:
+                log(f"Server {url} responded with status code {response.status_code}.")
+                return False
+    except httpx.RequestError as e:
+        log(f"Failed to check server availability for {url}: {e}", level="error")
         return False
     
 def remove_file(file_path: str):
@@ -33,33 +52,35 @@ def remove_file(file_path: str):
     """
     try:
         os.remove(file_path)
-        print(f"Temporary file {file_path} removed.")
+        log(f"Temporary file {file_path} removed.")
     except OSError as e:
-        print(f"Error removing file {file_path}: {e}")
+        log(f"Error removing file {file_path}: {e}", level="error")
 
 @app.get("/status")
 async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
+    worker1_node_status = await check_server_availability(f"{WORKER_NODE_1_URL}/status")
+    worker2_node_status = await check_server_availability(f"{WORKER_NODE_2_URL}/status")
+    worker3_node_status = await check_server_availability(f"{WORKER_NODE_3_URL}/status")
+    log("Service status checked.")
     return {
         "status": "running",
-        "SQLITE_URL" : SQLITE_URL,
-        "MONGO_SERVER_URL" : MONGO_SERVER_URL,
+        "SQLITE_URL": SQLITE_URL,
+        "MONGO_SERVER_URL": MONGO_SERVER_URL,
+        "WORKER_NODE_1_URL": WORKER_NODE_1_URL,
+        "WORKER_NODE_2_URL": WORKER_NODE_2_URL,
+        "WORKER_NODE_3_URL": WORKER_NODE_3_URL,
         "sqlite_status": sqlite_status,
-        "mongo_server_status": mongo_server_status
+        "mongo_server_status": mongo_server_status,
+        "worker1_node_status" : worker1_node_status,
+        "worker2_node_status" : worker2_node_status,
+        "worker3_node_status" : worker3_node_status,
     }
 
 def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
     """
     Конвертирует numpy.array в формат Matrix Market (.mtx) и сохраняет в файл.
-
-    Args:
-        matrix (np.ndarray): Матрица в формате numpy.array.
-        file_path (str): Путь к файлу для сохранения в формате .mtx.
-
-    Raises:
-        ValueError: Если входная матрица не двухмерная.
-        IOError: Если не удается сохранить файл.
     """
     if not isinstance(matrix, np.ndarray):
         raise ValueError("Input must be a numpy.ndarray.")
@@ -69,9 +90,10 @@ def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):
 
     try:
         mmwrite(file_path, matrix)
-        print(f"Matrix successfully saved in Matrix Market format to {file_path}")
+        log(f"Matrix successfully saved in Matrix Market format to {file_path}")
         return file_path
     except Exception as e:
+        log(f"Failed to write matrix to file: {e}", level="error")
         raise IOError(f"Failed to write matrix to file: {e}") from e
 
 @app.post("/get_matrix_by_name")
@@ -79,32 +101,30 @@ async def get_matrix_by_name(matrix_name: str):
     """
     Получение матрицы по имени с MongoDB сервера и конвертация в numpy.array.
     """
-    mongo_endpoint = f"{MONGO_SERVER_URL}/send_matrix_by_matrix_name"
+    mongo_endpoint = f"{MONGO_SERVER_URL}/get_matrix_by_matrix_name"
     try:
         async with httpx.AsyncClient() as client:
-            print(f"Trying to get matrix {matrix_name} from MongoDB")
+            log(f"Requesting matrix {matrix_name} from MongoDB at {mongo_endpoint}")
             response = await client.get(mongo_endpoint, params={"matrix_name": matrix_name})
             if response.status_code == 200:
+                log(f"Matrix {matrix_name} retrieved successfully from MongoDB.")
                 matrix_data = response.content
-                # Конвертируем данные из Matrix Market в numpy.array
                 try:
                     matrix = mmread(BytesIO(matrix_data))
-                    # Проверяем, является ли матрица разреженной (если да, преобразуем в плотную)
                     if isinstance(matrix, np.ndarray):
-                        print("Matrix is already a dense numpy array")
+                        log("Matrix is already a dense numpy array.")
                     else:
-                        print("Matrix is sparse, converting to dense numpy array")
-                        matrix = matrix.toarray()  # Преобразуем разреженную матрицу в плотную
-                    print("Matrix converted to np.array")
+                        log("Matrix is sparse, converting to dense numpy array.")
+                        matrix = matrix.toarray()
                     return matrix
                 except Exception as e:
-                    print(f"Failed to parse the matrix file (mtx -> np array): {e}")
+                    log(f"Failed to parse the matrix file: {e}", level="error")
                     raise HTTPException(status_code=500, detail=f"Failed to parse the matrix file: {e}") from e
             else:
-                print("Matrix not found on MongoDB server")
+                log(f"Matrix not found on MongoDB server: {response.status_code}")
                 raise HTTPException(status_code=response.status_code, detail="Matrix not found on MongoDB server")
     except httpx.RequestError as e:
-        print("Failed to connect to MongoDB server")
+        log(f"Failed to connect to MongoDB server: {e}", level="error")
         raise HTTPException(status_code=500, detail="Failed to connect to MongoDB server") from e
 
 @app.post("/print_matrix_by_matrix_name")
@@ -114,93 +134,197 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     """
     matrix_name = request.matrix_name
     try:
-        # Получаем матрицу в формате numpy.array
         matrix = await get_matrix_by_name(matrix_name)
-        print(f"Matrix '{matrix_name}':\n", np.round(matrix, 1))  # Округляем до 1 знака после запятой
+        log(f"Matrix '{matrix_name}':\n{np.round(matrix, 1)}")
         return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}
     except HTTPException as e:
+        log(f"HTTP error while printing matrix: {e.detail}", level="error")
         raise e
     except Exception as e:
+        log(f"Unexpected error: {e}", level="error")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}") from e
     
+
+async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
+    """
+    Отправляет матрицу на обработку воркер-нодам с учетом указанного алгоритма.
+
+    :param matrix: Матрица для обработки.
+    :param destination: Словарь с информацией о нодах и алгоритмах:
+        {
+            "WORKER_NODE_1": [WORKER_NODE_1_URL, 'LU'],
+            "WORKER_NODE_2": [WORKER_NODE_2_URL, 'QR'],
+            "WORKER_NODE_3": [WORKER_NODE_3_URL, 'LDL'],
+        }
+    :return: Словарь с ответами от нод или ошибками.
+    """
+    responses = {}
+    log("Starting task distribution to worker nodes.", level="info")
+
+    async with httpx.AsyncClient() as client:
+        tasks = []
+
+        for worker_name, (worker_url, algorithm) in destination.items():
+            if not worker_url:
+                log(f"URL for {worker_name} is not defined.", level="error")
+                responses[worker_name] = {"error": f"URL for {worker_name} is not defined."}
+                continue
+
+            # Подготовка данных для отправки
+            data_to_send = {
+                "input_matrix": matrix.tolist(),  # Преобразуем матрицу в список для передачи через JSON
+                "algorithm": algorithm,    # Алгоритм обработки (LU, QR, LDL и т.д.)
+            }
+            log(f"Preparing to send matrix to {worker_name} at {worker_url} using algorithm {algorithm}.", level="info")
+
+            # Создание задачи отправки POST-запроса
+            task = client.post(f"{worker_url}/process_task", json=data_to_send)
+            tasks.append((worker_name, task))
+
+        # Выполнение всех запросов
+        for worker_name, task in tasks:
+            try:
+                response = await task
+                if response.status_code == 200:
+                    log(f"Successfully sent matrix to {worker_name}. Response: {response.json()}", level="info")
+                    responses[worker_name] = response.json()
+                else:
+                    log(f"Failed to process matrix on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
+                    responses[worker_name] = {"error": f"HTTP {response.status_code}: {response.text}"}
+            except Exception as e:
+                log(f"Failed to connect to {worker_name} at {destination[worker_name][0]}: {e}", level="error")
+                responses[worker_name] = {"error": str(e)}
+
+    log("Task distribution to worker nodes completed.", level="info")
+    return responses
+
+
+def process_response(response: dict) -> dict:
+    """
+    Обрабатывает и форматирует ответ от воркер-нод.
+
+    :param response: Словарь с информацией от функции send_task_to_worker_nodes.
+    :return: Словарь, готовый для отправки в качестве JSON-ответа.
+    """
+    log("Processing responses from worker nodes.", level="info")
+    formatted_responses = {}
+
+    for worker, result in response.items():
+        if "error" in result:
+            # Если произошла ошибка, логируем и добавляем в итоговый словарь
+            log(f"Worker {worker} reported an error: {result['error']}", level="error")
+            formatted_responses[worker] = {
+                "status": "error",
+                "message": result["error"]
+            }
+        else:
+            # Обрабатываем успешный результат
+            log(f"Processing successful response from {worker}.", level="info")
+            input_matrix = result.get("input_matrix", [])
+            algorithm = result.get("algorithm", "unknown")
+            computed_result = result.get("result", [])
+            time_taken = result.get("time_taken", "unknown")
+
+            log(f"Worker {worker} used algorithm '{algorithm}' and completed in {time_taken} seconds.", level="info")
+            
+            formatted_responses[worker] = {
+                "status": "success",
+                "algorithm": algorithm,
+                "time_taken": time_taken,
+                "result": computed_result
+            }
+
+            # Форматируем красивый вывод в консоль
+            print("\n" + "-" * 50)
+            print(f"WORKER: {worker}")
+            print(f"Algorithm: {algorithm}")
+            print(f"Time Taken: {time_taken} seconds")
+            print("Input Matrix:")
+            for row in input_matrix:
+                print(row)
+            print("\nResult:")
+            for block in computed_result:
+                print("Block:")
+                for row in block:
+                    print(row)
+            print("-" * 50)
+
+    log("Responses processing completed.", level="info")
+    return formatted_responses
+
+# MAIN METHOD
+@app.post("/calculate_all_decompositions_of_matrix_by_matrix_name")
+async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
+    """
+    Вычисляет и возвращает все разложения матрицы по имени матрицы.
+    """
+    matrix_name = request.matrix_name
+    try:
+        matrix = await get_matrix_by_name(matrix_name)
+    except HTTPException as e:
+        log(f"Error fetching matrix: {e.detail}", level="error")
+        raise HTTPException(status_code=e.status_code, detail=f"Failed to fetch the matrix: {e.detail}")
+
+    try:
+        log('Sending matrix to worker nodes')
+        result = await send_task_to_worker_nodes(matrix, WORKER_NODE_URLS)
+    except ValueError as e:
+        log(f"Matrix inversion error: {e}", level="error")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        log('Making result beautiful!')
+        final_result = process_response(response=result)
+    except Exception as e:
+        log(f"Error on worker node : {e}", level='error')
+        
+        
+    log("Matrix inversion completed.")
+    
+    return final_result
+
+
+
 def calculate_invertible_matrix(matrix: np.array) -> np.array:
     """
     Вычисляет обратную матрицу для заданной матрицы.
-    
-    :param matrix: Входная матрица в формате numpy.array.
-    :return: Обратная матрица в формате numpy.array.
-    :raises ValueError: Если матрица не квадратная или необратимая.
     """
-    print(f'Trying to get invertible with np.linalg.inv')
-    # Проверка на квадратную форму
+    log("Calculating inverse matrix.")
     if matrix.shape[0] != matrix.shape[1]:
-        print("Matrix must be square to calculate its inverse")
+        log("Matrix must be square to calculate its inverse.", level="error")
         raise ValueError("Matrix must be square to calculate its inverse.")
 
-    # Проверка на необратимость
     determinant = np.linalg.det(matrix)
     if determinant == 0:
-        print("Matrix is not invertible (determinant is zero).")
+        log("Matrix is not invertible (determinant is zero).", level="error")
         raise ValueError("Matrix is not invertible (determinant is zero).")
     
-    # Вычисление обратной матрицы
+    
     inverse_matrix = np.linalg.inv(matrix)
+    log("Inverse matrix calculated successfully.")
     return inverse_matrix
+
 
 @app.post("/calculate_invertible_matrix_by_matrix_name")
 async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
     """
     Вычисляет и возвращает обратную матрицу по имени матрицы.
-    
-    Args:
-        request (MatrixRequest): Объект, содержащий имя матрицы (matrix_name).
-    
-    Returns:
-        dict: Оригинальная и обратная матрица в виде списков (для JSON-сериализации).
-        
-    запрос POST:
-    -H "Content-Type: application/json" -d '{"matrix_name": "Matrix_FIDAP005.mtx"}'
-
-    Ответ сервера:
-    
-        "original_matrix": [
-            [2, 1],
-            [5, 3]
-        ],
-        "inverse_matrix": [
-            [3.0, -1.0],
-            [-5.0, 2.0]
-        ]
-    
-    \nОтвет при ошибке:\n
-    {
-    "detail": "Failed to fetch the matrix: Matrix not found on MongoDB server"
-    }
-    
-    {
-    "detail": "Matrix is not invertible (determinant is zero)."
-    }
     """
     matrix_name = request.matrix_name
-    # Получение матрицы по имени
     try:
-        print(f"Trying to get {matrix_name} with await get_matrix_by_name")
-        matrix = await get_matrix_by_name(matrix_name)  # Возвращает матрицу как np.array
+        matrix = await get_matrix_by_name(matrix_name)
     except HTTPException as e:
-        print(f"error in getting matrix from MONGO : {e, e.detail}")
+        log(f"Error fetching matrix: {e.detail}", level="error")
         raise HTTPException(status_code=e.status_code, detail=f"Failed to fetch the matrix: {e.detail}")
 
-    # Вычисление обратной матрицы
     try:
-        print(f"Trying to get matrix^-1 with calculate_invertible_matrix")
         inverse_matrix = calculate_invertible_matrix(matrix)
     except ValueError as e:
-        print(f"error in np.linalg.inv = {str(e)}")
+        log(f"Matrix inversion error: {e}", level="error")
         raise HTTPException(status_code=400, detail=str(e))
-    print("matrix^-1 computed successfully!")
-    # Возвращение результата в формате JSON (списки для сериализации)
+
+    log("Matrix inversion completed.")
     return {
         "original_matrix": matrix.tolist(),
         "inverse_matrix": inverse_matrix.tolist()
     }
-    
