@@ -16,6 +16,11 @@ SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
 MAIN_SERVER_URL = os.getenv("MAIN_SERVER_URL")
 
+WORKER_NODE_1_URL = os.getenv("WORKER_NODE_1_URL")
+WORKER_NODE_2_URL = os.getenv("WORKER_NODE_2_URL")
+WORKER_NODE_3_URL = os.getenv("WORKER_NODE_3_URL")
+
+
 class MatrixRequest(BaseModel):
     matrix_name: str
 
@@ -49,13 +54,22 @@ def remove_file(file_path: str):
 async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
+    worker1_node_status = await check_server_availability(f"{WORKER_NODE_1_URL}/status")
+    worker2_node_status = await check_server_availability(f"{WORKER_NODE_2_URL}/status")
+    worker3_node_status = await check_server_availability(f"{WORKER_NODE_3_URL}/status")
     log("Service status checked.")
     return {
         "status": "running",
         "SQLITE_URL": SQLITE_URL,
         "MONGO_SERVER_URL": MONGO_SERVER_URL,
+        "WORKER_NODE_1_URL": WORKER_NODE_1_URL,
+        "WORKER_NODE_2_URL": WORKER_NODE_2_URL,
+        "WORKER_NODE_3_URL": WORKER_NODE_3_URL,
         "sqlite_status": sqlite_status,
-        "mongo_server_status": mongo_server_status
+        "mongo_server_status": mongo_server_status,
+        "worker1_node_status" : worker1_node_status,
+        "worker2_node_status" : worker2_node_status,
+        "worker3_node_status" : worker3_node_status,
     }
 
 def convert_np_array_to_matrix_market(matrix: np.ndarray, file_path: str):

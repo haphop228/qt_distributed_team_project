@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-sqlalchemy
 httpx
-motor
-pymongo
-python-multipart
+numpy
+scipy
