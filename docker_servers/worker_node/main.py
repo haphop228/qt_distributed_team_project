@@ -101,8 +101,8 @@ def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
 
 
 # Маршрут для обработки запросов
-@app.post("/decompose_matrix")
-async def decompose_matrix(request: DecompositionRequest):
+@app.post("/process_task")
+async def process_task(request: DecompositionRequest):
     """
     'input_matrix': [ [ 1,2 ] , [3, 4] ],\n
     'algorithm': 'lu',\n

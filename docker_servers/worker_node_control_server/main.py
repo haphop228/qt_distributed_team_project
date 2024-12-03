@@ -172,7 +172,7 @@ async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
 
             # Подготовка данных для отправки
             data_to_send = {
-                "matrix": matrix.tolist(),  # Преобразуем матрицу в список для передачи через JSON
+                "input_matrix": matrix.tolist(),  # Преобразуем матрицу в список для передачи через JSON
                 "algorithm": algorithm,    # Алгоритм обработки (LU, QR, LDL и т.д.)
             }
             log(f"Preparing to send matrix to {worker_name} at {worker_url} using algorithm {algorithm}.", level="info")
@@ -267,7 +267,7 @@ async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
 
     try:
         log('Sending matrix to worker nodes')
-        result = send_task_to_worker_nodes(matrix, WORKER_NODE_URLS)
+        result = await send_task_to_worker_nodes(matrix, WORKER_NODE_URLS)
     except ValueError as e:
         log(f"Matrix inversion error: {e}", level="error")
         raise HTTPException(status_code=400, detail=str(e))
@@ -276,7 +276,7 @@ async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
         log('Making result beautiful!')
         final_result = process_response(response=result)
     except Exception as e:
-        log(f"Error on worker node : {e}")
+        log(f"Error on worker node : {e}", level='error')
         
         
     log("Matrix inversion completed.")

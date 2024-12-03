@@ -241,7 +241,8 @@ async def find_matrix_by_filename(filename: str):
     """
     log(f"Searching for matrix with filename '{filename}'")
     try:
-        matrix = await db.fs.files.find_one({"filename": filename})
+        # find_one() уже асинхронный
+        matrix = db.fs.files.find_one({"filename": filename})
         if matrix:
             matrix_data = await get_correct_document(matrix)
             log(f"Matrix '{filename}' found")

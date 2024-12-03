@@ -176,7 +176,7 @@ async def get_matrix_by_matrix_name(matrix_name: str):
         raise HTTPException(status_code=404, detail="Matrix not found")
     
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mtx") as temp_file:
-        temp_file.write(matrix.read())
+        temp_file.write(matrix)
         temp_file_path = temp_file.name
     log(f"Matrix {matrix_name} sent as file: {temp_file_path}")
     return FileResponse(temp_file_path, media_type="application/octet-stream", filename=matrix_name)
