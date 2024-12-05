@@ -41,8 +41,10 @@ signals:
 
 private slots:
     void on_add_file_button_clicked();
-    void on_decomposite_button_clicked();
+    void on_inverse_button_clicked();
+    void on_decompositions_button_clicked();
     void on_load_file_to_server_button();
+
     void longRunningOperation();
 
 private:
@@ -52,7 +54,8 @@ private:
     QString m_userlogin;
 
     QPushButton *add_file_button;
-    QPushButton *decomposite_button;
+    QPushButton *inverse_button;
+    QPushButton *decompositions_button;
     QPushButton *load_file_to_server_button;
 
     QLineEdit *file_path_line_edit;

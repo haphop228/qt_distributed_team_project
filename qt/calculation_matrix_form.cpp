@@ -1,6 +1,7 @@
 #include "calculation_matrix_form.h"
 #include "ui_calculation_matrix_form.h"
 #include "download_files_form.h"
+#include "matrix_decomposition_results_window.h"
 #include <QtCore/qjsonobject.h>
 
 
@@ -180,7 +181,7 @@ void calculation_matrix_form::on_load_file_to_server_button()
     });
 }
 
-void calculation_matrix_form::on_decomposite_button_clicked()
+void calculation_matrix_form::on_inverse_button_clicked()
 {
     QString filePath = file_path_line_edit->text();
     if (filePath.isEmpty()) {
@@ -235,7 +236,7 @@ void calculation_matrix_form::on_decomposite_button_clicked()
                 download_files_form *downloadForm = new download_files_form();
                 downloadForm->setInverseMatrix(inverseMatrix); // Передаем матрицу
                 downloadForm->show();
-                this->close();
+
 
                 // Здесь можно обработать матрицы, например, отобразить их в UI или отправить дальше
             }
@@ -247,6 +248,96 @@ void calculation_matrix_form::on_decomposite_button_clicked()
         reply->deleteLater();
     });
 }
+
+
+void calculation_matrix_form::on_decompositions_button_clicked() {
+
+    QString filePath = file_path_line_edit->text();
+    if (filePath.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка", "Выберите файл для загрузки.");
+        return;
+    }
+
+    // Извлекаем имя матрицы из пути к файлу (например, последние части пути)
+    QFileInfo fileInfo(filePath);
+    QString matrixName = fileInfo.fileName();
+    qDebug() << "Matrix Name:" << matrixName;
+
+    // Создаем объект QNetworkAccessManager для отправки запроса
+    QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
+
+    // URL для отправки запроса
+    QUrl url(MAIN_SERVER_URL + "/calculate_all_decompositions_of_matrix_by_matrix_name");
+    QNetworkRequest request(url);
+
+    // Создаем JSON с именем матрицы
+    QJsonObject json;
+    json["matrix_name"] = matrixName;
+
+    // Преобразуем в QJsonDocument
+    QJsonDocument doc(json);
+    QByteArray data = doc.toJson();
+
+    // Устанавливаем заголовки
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // Отправляем POST-запрос
+    QNetworkReply *reply = networkManager->post(request, data);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+
+        // Считываем данные ответа один раз
+        QByteArray responseData = reply->readAll();
+        qDebug() << "Response JSON:" << QString::fromUtf8(responseData);
+
+        // Проверяем на наличие ошибок
+        if (reply->error() != QNetworkReply::NoError) {
+            QMessageBox::critical(this, "Error", "Failed to connect to the server: " + reply->errorString());
+            reply->deleteLater();
+            return;
+        }
+
+        // Обработка ответа сервера
+        QJsonDocument responseJson = QJsonDocument::fromJson(responseData);
+        if (responseJson.isNull() || !responseJson.isObject()) {
+            QMessageBox::critical(this, "Error", "Invalid server response format.");
+            reply->deleteLater();
+            return;
+        }
+
+        QJsonObject responseObject = responseJson.object();
+        bool hasSuccess = false;
+        QJsonObject results;
+
+        for (const QString &workerKey : responseObject.keys()) {
+            QJsonValue workerValue = responseObject.value(workerKey);
+            if (!workerValue.isObject()) {
+                continue;
+            }
+            QJsonObject workerData = workerValue.toObject();
+
+            QString status = workerData["status"].toString();
+            if (status == "success") {
+                hasSuccess = true;
+                results[workerKey] = workerData; // Сохраняем успешные результаты
+            }
+        }
+
+        reply->deleteLater();
+
+        if (hasSuccess) {
+            // Открытие окна с результатами
+            matrix_decomposition_results_window *resultsWindow = new matrix_decomposition_results_window(this);
+            resultsWindow->setResults(results); // Передать данные в окно
+            resultsWindow->show();
+        } else {
+            QMessageBox::warning(this, "No Results", "No successful decompositions were performed.");
+        }
+    });
+
+}
+
+
 
 // Функция "затычка"
 void calculation_matrix_form::longRunningOperation()
@@ -269,8 +360,8 @@ void calculation_matrix_form::setup_ui()
 
     add_file_button = new QPushButton("Добавить файл", this);
     load_file_to_server_button = new QPushButton("Загрузить файл на сервер", this);
-    decomposite_button = new QPushButton("Разложить матрицу", this);
-
+    inverse_button = new QPushButton("Вычислить обратную матрицу", this);
+    decompositions_button = new QPushButton("Разложить матрицу LU/QR/LDL", this);
     matrix_viewer = new QTableWidget;
     QStringList headers;
     headers << "Column 1" << "Column 2" << "Column 3" << "Column 4" << "Column 5";
@@ -291,7 +382,8 @@ void calculation_matrix_form::setup_ui()
 
     // Создаем горизонтальный компоновщик для кнопок
     QHBoxLayout *buttonLayout = new QHBoxLayout;
-    buttonLayout->addWidget(decomposite_button);
+    buttonLayout->addWidget(inverse_button);
+    buttonLayout->addWidget(decompositions_button);
 
     // Добавляем горизонтальный компоновщик к основному
     mainLayout->addLayout(buttonLayout);
@@ -308,7 +400,8 @@ void calculation_matrix_form::setup_ui()
     this->show();
 
     // Подключаем сигналы к слоту
-    connect(decomposite_button, &QPushButton::clicked, this, &calculation_matrix_form::on_decomposite_button_clicked);
+    connect(inverse_button, &QPushButton::clicked, this, &calculation_matrix_form::on_inverse_button_clicked);
+    connect(decompositions_button, &QPushButton::clicked, this, &calculation_matrix_form::on_decompositions_button_clicked);
     connect(add_file_button, &QPushButton::clicked, this, &calculation_matrix_form::on_add_file_button_clicked);
     connect(load_file_to_server_button, &QPushButton::clicked, this, &calculation_matrix_form::on_load_file_to_server_button);
 }
