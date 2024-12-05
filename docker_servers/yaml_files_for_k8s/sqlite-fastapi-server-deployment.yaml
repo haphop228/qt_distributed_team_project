@@ -1,0 +1,45 @@
+# sqlite-fastapi-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sqlite-fastapi-server
+  labels:
+    app: sqlite-fastapi-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sqlite-fastapi-server
+  template:
+    metadata:
+      labels:
+        app: sqlite-fastapi-server
+    spec:
+      containers:
+      - name: sqlite-fastapi-server
+        image: alice3e/sqlite_app:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: config-sqlite
+        volumeMounts:
+        - mountPath: /app/data  # Монтируем путь в контейнер
+          name: sqlite-volume
+      volumes:
+      - name: sqlite-volume
+        persistentVolumeClaim:
+          claimName: sqlite-pvc  # Ссылаемся на PVC (а не на PV)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlite-fastapi-server
+spec:
+  selector:
+    app: sqlite-fastapi-server
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP  # Тип ClusterIP, доступен только внутри кластера

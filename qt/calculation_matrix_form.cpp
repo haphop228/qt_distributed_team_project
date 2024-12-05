@@ -5,7 +5,12 @@
 #include <QtCore/qjsonobject.h>
 
 
-const QString MAIN_SERVER_URL("http://localhost:8002");
+// Используйте эту строку, если поднимаете с помощью docker compose
+// main server http://localhost:8002
+
+// Если вы поднимаете кластер с помощью Minikube, то пропишите в терминале "minikube ip" и вставьте "http://<minikube ip>:30001"
+const QString MAIN_SERVER_URL("http://172.27.181.239:30001");
+
 
 calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidget *parent)
     : QMainWindow(parent)

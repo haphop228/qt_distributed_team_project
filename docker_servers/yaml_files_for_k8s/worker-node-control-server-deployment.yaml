@@ -1,0 +1,45 @@
+# worker-node-control-server-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-node-control-server
+  labels:
+    app: worker-node-control-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-node-control-server
+  template:
+    metadata:
+      labels:
+        app: worker-node-control-server
+    spec:
+      containers:
+      - name: worker-node-control-server
+        image: alice3e/worker_node_control_server:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: config-worker-node
+      volumes:
+      - name: mongo-volume
+        persistentVolumeClaim:
+          claimName: mongo-pvc
+      - name: sqlite-volume
+        persistentVolumeClaim:
+          claimName: sqlite-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: worker-node-control-server
+spec:
+  selector:
+    app: worker-node-control-server
+  ports:
+    - protocol: TCP
+      port: 8003
+      targetPort: 8000
+  type: ClusterIP  # Тип ClusterIP, доступен только внутри кластера

@@ -118,7 +118,37 @@ This project consists of multiple Docker containers that work together to provid
 - **Environment**: `./configs/config_mongo_db.env`.
 - **Data Volume**: MongoDB database stored in `db_mongo`.
 
-## How to Start the Application
+## How to Start the Application with minikube
+To run all services, navigate to the project directory(`qt_distributed_team_project\docker_servers`) and execute:
+```bash
+minikube start --driver=hyperv
+```
+Then you need to create configmap to use environments. Execute:
+```bash
+kubectl create configmap config-mongo-db --from-env-file=./configs/config_mongo_db.env
+kubectl create configmap config-sqlite --from-env-file=./configs/config_sqlite.env
+kubectl create configmap config-mongo-server --from-env-file=./configs/config_mongo_server.env
+kubectl create configmap config-main-server --from-env-file=./configs/config_main_server.env
+kubectl create configmap config-worker-node --from-env-file=./configs/config_worker_node_control_server.env
+```
+You can check if everything is okay using:
+```bash
+kubectl get pods
+```
+If all pods are `Running` then it's good.
+
+Last step you need to open QT client and in files:
+`calculation_matrix_form.cpp`, `login_form.cpp` and `registration_form.cpp` change the IP.
+Execute:
+```bash
+minikube ip
+```
+then insert what you get in
+```c++
+const QString MAIN_SERVER_URL("http://<minikube ip>:30001");
+```
+
+## How to Start the Application with docker-compose
 
 To run all services, navigate to the project directory and execute:
 
