@@ -135,7 +135,7 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     matrix_name = request.matrix_name
     try:
         matrix = await get_matrix_by_name(matrix_name)
-        log(f"Matrix '{matrix_name}':\n{np.round(matrix, 1)}")
+        log(f"Matrix '{matrix_name}'")
         return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}
     except HTTPException as e:
         log(f"HTTP error while printing matrix: {e.detail}", level="error")
@@ -239,14 +239,14 @@ def process_response(response: dict) -> dict:
             print(f"WORKER: {worker}")
             print(f"Algorithm: {algorithm}")
             print(f"Time Taken: {time_taken} seconds")
-            print("Input Matrix:")
-            for row in input_matrix:
-                print(row)
-            print("\nResult:")
-            for block in computed_result:
-                print("Block:")
-                for row in block:
-                    print(row)
+            # print("Input Matrix:")
+            # for row in input_matrix:
+            #     print(row)
+            # print("\nResult:")
+            # for block in computed_result:
+            #     print("Block:")
+            #     for row in block:
+            #         print(row)
             print("-" * 50)
 
     log("Responses processing completed.", level="info")

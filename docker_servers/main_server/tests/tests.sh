@@ -17,8 +17,8 @@ echo "USER_LOGIN: $USER_LOGIN"
 echo "USER_PASSWORD: $USER_PASSWORD"
 
 # Test Matrix File
-MATRIX_FILE_PATH="./6x6_matrix.mtx"
-MATRIX_FILE_NAME="6x6_matrix.mtx"
+MATRIX_FILE_PATH="./100x100_matrix_26KB.mtx"
+MATRIX_FILE_NAME="100x100_matrix_26KB.mtx"
 
 # cd ../../ 
 # docker-compose up -u
