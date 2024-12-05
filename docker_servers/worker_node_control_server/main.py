@@ -135,7 +135,7 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
     matrix_name = request.matrix_name
     try:
         matrix = await get_matrix_by_name(matrix_name)
-        log(f"Matrix '{matrix_name}':\n{np.round(matrix, 1)}")
+        log(f"Matrix '{matrix_name}'")
         return {"message": f"Matrix '{matrix_name}' printed to the terminal successfully"}
     except HTTPException as e:
         log(f"HTTP error while printing matrix: {e.detail}", level="error")
@@ -190,10 +190,12 @@ async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
                     responses[worker_name] = response.json()
                 else:
                     log(f"Failed to process matrix on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
-                    responses[worker_name] = {"error": f"HTTP {response.status_code}: {response.text}"}
+                    responses[worker_name] = {"error": f" -_- HTTP {response.status_code}"}
             except Exception as e:
                 log(f"Failed to connect to {worker_name} at {destination[worker_name][0]}: {e}", level="error")
                 responses[worker_name] = {"error": str(e)}
+
+    log(f"Final responses: {responses}", level="debug")
 
     log("Task distribution to worker nodes completed.", level="info")
     return responses
@@ -215,7 +217,7 @@ def process_response(response: dict) -> dict:
             log(f"Worker {worker} reported an error: {result['error']}", level="error")
             formatted_responses[worker] = {
                 "status": "error",
-                "message": result["error"]
+                "message": "Internal Server Error"
             }
         else:
             # Обрабатываем успешный результат
@@ -239,17 +241,20 @@ def process_response(response: dict) -> dict:
             print(f"WORKER: {worker}")
             print(f"Algorithm: {algorithm}")
             print(f"Time Taken: {time_taken} seconds")
-            print("Input Matrix:")
-            for row in input_matrix:
-                print(row)
-            print("\nResult:")
-            for block in computed_result:
-                print("Block:")
-                for row in block:
-                    print(row)
+            # print("Input Matrix:")
+            # for row in input_matrix:
+            #     print(row)
+            # print("\nResult:")
+            # for block in computed_result:
+            #     print("Block:")
+            #     for row in block:
+            #         print(row)
             print("-" * 50)
+    
+    log(f"Responses \n\n{formatted_responses}\n\n")
 
     log("Responses processing completed.", level="info")
+    
     return formatted_responses
 
 # MAIN METHOD
