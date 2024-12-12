@@ -9,7 +9,7 @@
 // main server http://localhost:8002
 
 // Если вы поднимаете кластер с помощью Minikube, то пропишите в терминале "minikube ip" и вставьте "http://<minikube ip>:30001"
-const QString MAIN_SERVER_URL("http://172.27.181.239:30001");
+const QString MAIN_SERVER_URL("http://localhost:8002");
 
 
 calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidget *parent)
@@ -21,8 +21,8 @@ calculation_matrix_form::calculation_matrix_form(const QString &userlogin, QWidg
     setup_ui();
 }
 
-void calculation_matrix_form::on_add_file_button_clicked() {
-    // TODO : пофиксить показ матриц у которых другие типы (не  matrix array integer\real general)
+void calculation_matrix_form::on_add_and_upload_file_button_clicked() {
+    // Шаг 1: Открываем диалог выбора файла
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open Matrix File"), "", tr("Matrix Market (*.mtx);;All Files (*.*)"));
     if (fileName.isEmpty()) return;
 
@@ -32,102 +32,19 @@ void calculation_matrix_form::on_add_file_button_clicked() {
     // Отображаем название файла в QLabel
     your_matrix_label->setText("Loaded Matrix: " + QFileInfo(fileName).fileName());
 
+    // Загружаем файл на сервер
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this, tr("Error"), tr("Could not open file"));
         return;
     }
 
-    QTextStream in(&file);
-    QString line;
-    bool isPattern = false;
-    bool isCoordinate = false;
-    bool isArray = false;
-    bool isInteger = false;
-    bool isReal = false;
-
-    // Читаем заголовок формата
-    while (!in.atEnd()) {
-        line = in.readLine();
-        if (line.startsWith("%%MatrixMarket")) {
-            isPattern = line.contains("pattern"); // TODO // Проверяем, является ли формат "pattern"
-            isCoordinate = line.contains("coordinate"); // TODO  // Проверяем на координатный формат
-            isArray = line.contains("array");  // Проверяем на массивный формат
-            isInteger = line.contains("integer");  // Проверяем на целочисленный формат
-            isReal = line.contains("real");
-        }
-        if (!line.startsWith("%")) break;  // Пропускаем комментарии
-    }
-
-    // Читаем размер матрицы и количество элементов
-    QStringList sizeData = line.split(' ', Qt::SkipEmptyParts);
-    if (sizeData.size() < 2) {
-        QMessageBox::warning(this, tr("Error"), tr("Invalid Matrix Market format"));
-        return;
-    }
-
-    int rows = sizeData[0].toInt();
-    int columns = sizeData[1].toInt();
-
-    // Устанавливаем размер таблицы в QTableWidget
-    matrix_viewer->setRowCount(rows);
-    matrix_viewer->setColumnCount(columns);
-
-    // Устанавливаем фиксированный размер ячеек для равной ширины и высоты
-    int cellSize = 50;
-    for (int i = 0; i < rows; ++i) {
-        matrix_viewer->setRowHeight(i, cellSize);
-    }
-    for (int j = 0; j < columns; ++j) {
-        matrix_viewer->setColumnWidth(j, cellSize);
-    }
-
-    // Обработка элементов матрицы в зависимости от типа
-    int count = 0;
-    while (!in.atEnd()) {
-        line = in.readLine();
-        if (line.isEmpty()) continue;
-
-        QStringList elements = line.split(' ', Qt::SkipEmptyParts);
-        if (elements.size() < 1) continue;
-
-        double value = 0.0;
-        if (isArray) {
-            if (isInteger) {
-                // Для целочисленных значений
-                if (elements.size() < 1) continue;
-                value = elements[0].toInt();
-            } else if (isReal){
-                // Для вещественных значений
-                if (elements.size() < 1) continue;
-                value = elements[0].toDouble();
-            }
-        }
-
-        int row = count / columns;
-        int col = count % columns;
-
-        // Заполняем таблицу значениями
-        QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
-        item->setTextAlignment(Qt::AlignCenter);
-        matrix_viewer->setItem(row, col, item);
-
-        count++;
-    }
-
-    file.close();
-}
-
-
-// Реализация функции загрузки файла на сервер
-void calculation_matrix_form::on_load_file_to_server_button()
-{
-    QString filePath = file_path_line_edit->text();
+    // Шаг 2: Отправляем файл на сервер
+    QString filePath = fileName; // Используем выбранный путь к файлу
     if (filePath.isEmpty()) {
         QMessageBox::warning(this, "Ошибка", "Выберите файл для загрузки.");
         return;
     }
-
 
     // Создаем объект QNetworkAccessManager для отправки запроса
     QNetworkAccessManager *networkManager = new QNetworkAccessManager(this);
@@ -142,22 +59,22 @@ void calculation_matrix_form::on_load_file_to_server_button()
     // Параметр "login"
     QHttpPart loginPart;
     loginPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"login\""));
-    loginPart.setBody(m_userlogin.toUtf8());  // Установка логина как QByteArray
+    loginPart.setBody(m_userlogin.toUtf8());
     multiPart->append(loginPart);
 
     // Параметр "matrix_file" (сам файл)
-    QFile *file = new QFile(filePath);
-    if (!file->open(QIODevice::ReadOnly)) {
+    QFile *uploadFile = new QFile(filePath);
+    if (!uploadFile->open(QIODevice::ReadOnly)) {
         QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл.");
         delete multiPart;
-        delete file;
+        delete uploadFile;
         return;
     }
 
     QHttpPart filePart;
-    filePart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"matrix_file\"; filename=\"" + file->fileName() + "\""));
-    filePart.setBodyDevice(file);  // Указываем файл как источник данных
-    file->setParent(multiPart);    // Удаление файла вместе с multiPart
+    filePart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"matrix_file\"; filename=\"" + uploadFile->fileName() + "\""));
+    filePart.setBodyDevice(uploadFile);  // Указываем файл как источник данных
+    uploadFile->setParent(multiPart);    // Удаление файла вместе с multiPart
 
     multiPart->append(filePart);
 
@@ -169,7 +86,6 @@ void calculation_matrix_form::on_load_file_to_server_button()
     connect(reply, &QNetworkReply::finished, this, [reply, this]() {
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray responseData = reply->readAll();
-            // Парсим ответ (ожидается JSON)
             QJsonDocument jsonResponse = QJsonDocument::fromJson(responseData);
             QJsonObject jsonObject = jsonResponse.object();
 
@@ -185,6 +101,7 @@ void calculation_matrix_form::on_load_file_to_server_button()
         reply->deleteLater();
     });
 }
+
 
 void calculation_matrix_form::on_inverse_button_clicked()
 {
@@ -363,8 +280,7 @@ void calculation_matrix_form::setup_ui()
     file_path_line_edit = new QLineEdit;
     file_path_line_edit->setPlaceholderText("Введите путь к файлу..."); // Устанавливаем текст-подсказку
 
-    add_file_button = new QPushButton("Добавить файл", this);
-    load_file_to_server_button = new QPushButton("Загрузить файл на сервер", this);
+    add_and_upload_file_button = new QPushButton("Добавить и загрузить файл", this);
     inverse_button = new QPushButton("Вычислить обратную матрицу", this);
     decompositions_button = new QPushButton("Разложить матрицу LU/QR/LDL", this);
     matrix_viewer = new QTableWidget;
@@ -380,8 +296,7 @@ void calculation_matrix_form::setup_ui()
     // Добавляем элементы к вертикальному компоновщику
     mainLayout->addWidget(add_file_label);
     mainLayout->addWidget(file_path_line_edit);
-    mainLayout->addWidget(add_file_button);
-    mainLayout->addWidget(load_file_to_server_button);
+    mainLayout->addWidget(add_and_upload_file_button);
     mainLayout->addWidget(your_matrix_label);
     mainLayout->addWidget(matrix_viewer);
 
@@ -407,8 +322,8 @@ void calculation_matrix_form::setup_ui()
     // Подключаем сигналы к слоту
     connect(inverse_button, &QPushButton::clicked, this, &calculation_matrix_form::on_inverse_button_clicked);
     connect(decompositions_button, &QPushButton::clicked, this, &calculation_matrix_form::on_decompositions_button_clicked);
-    connect(add_file_button, &QPushButton::clicked, this, &calculation_matrix_form::on_add_file_button_clicked);
-    connect(load_file_to_server_button, &QPushButton::clicked, this, &calculation_matrix_form::on_load_file_to_server_button);
+    connect(add_and_upload_file_button, &QPushButton::clicked, this, &calculation_matrix_form::on_add_and_upload_file_button_clicked);
+
 }
 
 
