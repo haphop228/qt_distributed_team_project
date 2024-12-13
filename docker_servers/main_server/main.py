@@ -9,8 +9,7 @@ app = FastAPI()
 # Загрузка конфигураций
 SQLITE_URL = os.getenv("SQLITE_URL")
 MONGO_SERVER_URL = os.getenv("MONGO_SERVER_URL")
-WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL")
-
+WORKER_CONTROL_SERVER_URL = os.getenv("WORKER_CONTROL_SERVER_URL", default="http://worker-node-control-server:8003")
 # Pydantic модель для регистрации пользователя
 class RegisterCredentials(BaseModel):
     name: str
@@ -35,6 +34,7 @@ async def check_server_availability(url: str):
     try:
         log(f"Checking server availability: {url}")
         async with httpx.AsyncClient() as client:
+            print(f" checking server availability for url:{url}")
             response = await client.get(url)
             if response.status_code == 200:
                 log(f"Server available: {url}")
@@ -42,6 +42,11 @@ async def check_server_availability(url: str):
     except httpx.RequestError as e:
         log(f"Request error while checking {url}: {e}", level="error")
     return False
+
+# Корневой маршрут, добавьте его
+@app.get("/")
+async def read_root():
+    return {"message": "Welcome to the main server"}
 
 # API для входа пользователя
 @app.post("/login")
@@ -169,7 +174,6 @@ async def get_status():
     sqlite_status = await check_server_availability(f"{SQLITE_URL}/status")
     mongo_server_status = await check_server_availability(f"{MONGO_SERVER_URL}/status")
     worker_control_server_status = await check_server_availability(f"{WORKER_CONTROL_SERVER_URL}/status")
-
     log(f"Server statuses: SQLite={sqlite_status}, MongoDB={mongo_server_status}, WorkerControl={worker_control_server_status}")
     return {
         "status": "running",
