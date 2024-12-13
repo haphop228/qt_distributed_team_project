@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
-
+import asyncio
 import httpx
 import os
 import numpy as np
@@ -22,9 +22,9 @@ WORKER_NODE_2_URL = os.getenv("WORKER_NODE_2_URL")
 WORKER_NODE_3_URL = os.getenv("WORKER_NODE_3_URL")
 
 WORKER_NODE_URLS = {
-    "WORKER_NODE_1": [WORKER_NODE_1_URL, 'LU'],
-    "WORKER_NODE_2": [WORKER_NODE_2_URL, 'QR'],
-    "WORKER_NODE_3": [WORKER_NODE_3_URL, 'LDL'],
+    "WORKER_NODE_1": WORKER_NODE_1_URL,
+    "WORKER_NODE_2": WORKER_NODE_2_URL,
+    "WORKER_NODE_3": WORKER_NODE_3_URL,
 }
 
 class MatrixRequest(BaseModel):
@@ -144,8 +144,88 @@ async def print_matrix_by_matrix_name(request: MatrixRequest):
         log(f"Unexpected error: {e}", level="error")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {e}") from e
     
+    
+# Функция отправки задачи на worker node
+async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: int = 5, retry_delay: float = 1.0):
+    """
+    Отправляет задачу на наименее загруженный worker node. Если все узлы заняты, повторяет попытку.
 
-async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
+    Args:
+        matrix (np.array): Матрица для обработки.
+        algorithm (str): Алгоритм обработки (например, "lu", "qr", "ldl").
+        retries (int): Количество попыток.
+        retry_delay (float): Задержка между попытками (в секундах).
+
+    Returns:
+        dict: Ответ от выбранного worker node.
+
+    Raises:
+        HTTPException: Если ни один узел не доступен после всех попыток.
+    """
+    for attempt in range(retries):
+        log(f"Attempt {attempt + 1} of {retries} to send task.", level="info")
+
+        worker_statuses = []
+        async with httpx.AsyncClient() as client:
+            for worker_name, worker_url in WORKER_NODE_URLS.items():
+                if not worker_url:
+                    log(f"URL for {worker_name} is not defined.", level="error")
+                    continue
+
+                try:
+                    log(f"Checking status of {worker_name} at {worker_url}.", level="info")
+                    response = await client.get(f"{worker_url}/status")
+                    if response.status_code == 200:
+                        status = response.json()
+                        log(f"Status of {worker_name}: {status}", level="info")
+                        worker_statuses.append((worker_name, worker_url, status))
+                    else:
+                        log(f"Failed to get status of {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
+                except Exception as e:
+                    log(f"Error checking status of {worker_name}: {e}", level="error")
+
+        # Фильтрация свободных узлов
+        free_workers = [
+            (name, url, status)
+            for name, url, status in worker_statuses
+            if not status.get("running", True)
+        ]
+
+        if free_workers:
+            # Сортировка свободных узлов по нагрузке
+            free_workers.sort(key=lambda x: (x[2]["load"]["cpu"], x[2]["load"]["memory"]))
+            selected_worker = free_workers[0]
+            worker_name, worker_url, _ = selected_worker
+
+            # Отправка задачи на выбранный узел
+            try:
+                data_to_send = {
+                    "input_matrix": matrix.tolist(),
+                    "algorithm": algorithm,
+                }
+                log(f"Sending task to {worker_name} at {worker_url}.", level="info")
+                response = await client.post(f"{worker_url}/process_task", json=data_to_send)
+
+                if response.status_code == 200:
+                    log(f"Task successfully sent to {worker_name}. Response: {response.json()}", level="info")
+                    return response.json()
+                else:
+                    log(f"Failed to process task on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
+                    return response.json()
+            except Exception as e:
+                log(f"Error sending task to {worker_name}: {e}", level="error")
+                HTTPException(status_code=503, detail=f"Error sending task to {worker_name}: {e}")
+
+        # Если все узлы заняты, ждем перед повторной попыткой
+        log(f"All workers are busy. Retrying in {retry_delay} seconds...", level="warning")
+        await asyncio.sleep(retry_delay)
+
+    # Если после всех попыток узел не найден
+    log("No available worker nodes after maximum retries.", level="error")
+    raise HTTPException(status_code=503, detail="No available worker nodes.")
+
+
+async def send_task_to_worker_nodes(matrix: np.array, destination: dict,):
     """
     Отправляет матрицу на обработку воркер-нодам с учетом указанного алгоритма.
 
@@ -203,10 +283,10 @@ async def send_task_to_worker_nodes(matrix: np.array, destination: dict):
 
 def process_response(response: dict) -> dict:
     """
-    Обрабатывает и форматирует ответ от воркер-нод.
+    Обрабатывает и форматирует ответ от воркер-ноды.
 
-    :param response: Словарь с информацией от функции send_task_to_worker_nodes.
-    :return: Словарь, готовый для отправки в качестве JSON-ответа.
+    :param response: response с информацией от функции send_task_to_worker_nodes.
+    :return: JSON-ответ.
     """
     log("Processing responses from worker nodes.", level="info")
     formatted_responses = {}
