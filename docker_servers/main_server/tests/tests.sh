@@ -106,6 +106,24 @@ curl -X POST "$MAIN_SERVER_URL/calculate_decomposition_of_matrix_by_matrix_name"
 -H "Content-Type: application/json" \
 -d '{"matrix_name": "'"$MATRIX_FILE_NAME"'" , "algorithm" : "qr"}'
 
+sleep 0.5
+
+curl -X POST "$MAIN_SERVER_URL/calculate_decomposition_of_matrix_by_matrix_name" \
+-H "Content-Type: application/json" \
+-d '{"matrix_name": "'"$MATRIX_FILE_NAME"'" , "algorithm" : "qr"}'
+
+sleep 0.5
+
+curl -X POST "$MAIN_SERVER_URL/calculate_decomposition_of_matrix_by_matrix_name" \
+-H "Content-Type: application/json" \
+-d '{"matrix_name": "'"$MATRIX_FILE_NAME"'" , "algorithm" : "qr"}'
+
+sleep 0.5
+
+curl -X POST "$MAIN_SERVER_URL/calculate_decomposition_of_matrix_by_matrix_name" \
+-H "Content-Type: application/json" \
+-d '{"matrix_name": "'"$MATRIX_FILE_NAME"'" , "algorithm" : "qr"}'
+
 
 echo ""
 echo ""

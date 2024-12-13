@@ -30,6 +30,9 @@ WORKER_NODE_URLS = {
 class MatrixRequest(BaseModel):
     matrix_name: str
     algorithm: str
+    
+class InvertibleMatrixRequest(BaseModel):
+    matrix_name: str
 
 # Function to check server availability
 async def check_server_availability(url: str):
@@ -163,11 +166,11 @@ async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: in
     Raises:
         HTTPException: Если ни один узел не доступен после всех попыток.
     """
-    for attempt in range(retries):
-        log(f"Attempt {attempt + 1} of {retries} to send task.", level="info")
+    async with httpx.AsyncClient() as client:
+        for attempt in range(retries):
+            log(f"Attempt {attempt + 1} of {retries} to send task.", level="info")
 
-        worker_statuses = []
-        async with httpx.AsyncClient() as client:
+            worker_statuses = []
             for worker_name, worker_url in WORKER_NODE_URLS.items():
                 if not worker_url:
                     log(f"URL for {worker_name} is not defined. Skipping.", level="warning")
@@ -188,45 +191,49 @@ async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: in
                 except Exception as e:
                     log(f"Error checking status of {worker_name}: {e}", level="error")
 
-        # Фильтрация свободных узлов
-        free_workers = [
-            (name, url, status)
-            for name, url, status in worker_statuses
-            if not status.get("running", True) and "load" in status
-        ]
+            # Фильтрация свободных узлов
+            free_workers = [
+                (name, url, status)
+                for name, url, status in worker_statuses
+                if not status.get("running", True) in status
+            ]
+            log(f"free workers list = {free_workers}")
 
-        if free_workers:
-            # Сортировка свободных узлов по нагрузке
-            free_workers.sort(key=lambda x: (x[2]["load"].get("cpu", float('inf')), x[2]["load"].get("memory", float('inf'))))
-            selected_worker = free_workers[0]
-            worker_name, worker_url, _ = selected_worker
+            if free_workers:
+                # Сортировка свободных узлов по нагрузке
+                free_workers.sort(key=lambda x: (x[2]["load"].get("cpu", float('inf')), x[2]["load"].get("memory", float('inf'))))
+                selected_worker = free_workers[0]
+                worker_name, worker_url, _ = selected_worker
 
-            # Отправка задачи на выбранный узел
-            try:
-                data_to_send = {
-                    "input_matrix": matrix.tolist(),
-                    "algorithm": algorithm,
-                }
-                log(f"Sending task to {worker_name} at {worker_url}.", level="info")
-                response = await client.post(f"{worker_url}/process_task", json=data_to_send)
+                # Отправка задачи на выбранный узел
+                try:
+                    data_to_send = {
+                        "input_matrix": matrix.tolist(),
+                        "algorithm": algorithm,
+                    }
+                    log(f"sending data: \n\n{data_to_send} \n\n")
+                    log(f"Sending task to {worker_name} at {worker_url}.", level="info")
+                    
+                    response = await client.post(f"{worker_url}/process_task", json=data_to_send)
 
-                if response.status_code == 200:
-                    log(f"Task successfully sent to {worker_name}. Response: {response.json()}", level="info")
-                    return response.json()
-                else:
-                    log(f"Failed to process task on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
-                    raise HTTPException(status_code=503, detail=f"Task failed on {worker_name}. HTTP {response.status_code}")
-            except Exception as e:
-                log(f"Error sending task to {worker_name}: {e}", level="error")
-                raise HTTPException(status_code=503, detail=f"Error sending task to {worker_name}: {e}")
+                    if response.status_code == 200:
+                        log(f"Task successfully sent to {worker_name}. Response: {response.json()}", level="info")
+                        return response.json()
+                    else:
+                        log(f"Failed to process task on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
+                        raise HTTPException(status_code=503, detail=f"Task failed on {worker_name}. HTTP {response.status_code}")
+                except Exception as e:
+                    # TODO : bugfix
+                    log(f"Error sending task to {worker_name}: {e}", level="error")
+                    raise HTTPException(status_code=503, detail=f"Error sending task to {worker_name}: {e}")
 
-        # Если все узлы заняты, ждем перед повторной попыткой
-        log(f"All workers are busy. Retrying in {retry_delay} seconds...", level="warning")
-        await asyncio.sleep(retry_delay)
+            # Если все узлы заняты, ждем перед повторной попыткой
+            log(f"All workers are busy. Retrying in {retry_delay} seconds...", level="warning")
+            await asyncio.sleep(retry_delay)
 
-    # Если после всех попыток узел не найден
-    log("No available worker nodes after maximum retries.", level="error")
-    raise HTTPException(status_code=503, detail="No available worker nodes.")
+        # Если после всех попыток узел не найден
+        log("No available worker nodes after maximum retries.", level="error")
+        raise HTTPException(status_code=503, detail="No available worker nodes.")
 
 
 # MAIN METHOD
@@ -256,8 +263,6 @@ async def calculate_decomposition_of_matrix_by_matrix_name(request: MatrixReques
     return result
 
 
-
-
 def calculate_invertible_matrix(matrix: np.array) -> np.array:
     """
     Вычисляет обратную матрицу для заданной матрицы.
@@ -279,7 +284,7 @@ def calculate_invertible_matrix(matrix: np.array) -> np.array:
 
 
 @app.post("/calculate_invertible_matrix_by_matrix_name")
-async def calculate_invertible_matrix_by_matrix_name(request: MatrixRequest):
+async def calculate_invertible_matrix_by_matrix_name(request: InvertibleMatrixRequest):
     """
     Вычисляет и возвращает обратную матрицу по имени матрицы.
     """
