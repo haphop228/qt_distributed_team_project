@@ -71,6 +71,84 @@ void calculation_matrix_form::on_add_and_upload_file_button_clicked() {
         return;
     }
 
+    QTextStream in(&file);
+    QString line;
+    bool isPattern = false;
+    bool isCoordinate = false;
+    bool isArray = false;
+    bool isInteger = false;
+    bool isReal = false;
+
+    // Читаем заголовок формата
+    while (!in.atEnd()) {
+        line = in.readLine();
+        if (line.startsWith("%%MatrixMarket")) {
+            isPattern = line.contains("pattern"); // TODO // Проверяем, является ли формат "pattern"
+            isCoordinate = line.contains("coordinate"); // TODO  // Проверяем на координатный формат
+            isArray = line.contains("array");  // Проверяем на массивный формат
+            isInteger = line.contains("integer");  // Проверяем на целочисленный формат
+            isReal = line.contains("real");
+        }
+        if (!line.startsWith("%")) break;  // Пропускаем комментарии
+    }
+
+    // Читаем размер матрицы и количество элементов
+    QStringList sizeData = line.split(' ', Qt::SkipEmptyParts);
+    if (sizeData.size() < 2) {
+        QMessageBox::warning(this, tr("Error"), tr("Invalid Matrix Market format"));
+        return;
+    }
+
+    int rows = sizeData[0].toInt();
+    int columns = sizeData[1].toInt();
+
+    // Устанавливаем размер таблицы в QTableWidget
+    matrix_viewer->setRowCount(rows);
+    matrix_viewer->setColumnCount(columns);
+
+    // Устанавливаем фиксированный размер ячеек для равной ширины и высоты
+    int cellSize = 50;
+    for (int i = 0; i < rows; ++i) {
+        matrix_viewer->setRowHeight(i, cellSize);
+    }
+    for (int j = 0; j < columns; ++j) {
+        matrix_viewer->setColumnWidth(j, cellSize);
+    }
+
+    // Обработка элементов матрицы в зависимости от типа
+    int count = 0;
+    while (!in.atEnd()) {
+        line = in.readLine();
+        if (line.isEmpty()) continue;
+
+        QStringList elements = line.split(' ', Qt::SkipEmptyParts);
+        if (elements.size() < 1) continue;
+
+        double value = 0.0;
+        if (isArray) {
+            if (isInteger) {
+                // Для целочисленных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toInt();
+            } else if (isReal){
+                // Для вещественных значений
+                if (elements.size() < 1) continue;
+                value = elements[0].toDouble();
+            }
+        }
+
+        int row = count / columns;
+        int col = count % columns;
+
+        // Заполняем таблицу значениями
+        QTableWidgetItem *item = new QTableWidgetItem(QString::number(value));
+        item->setTextAlignment(Qt::AlignCenter);
+        matrix_viewer->setItem(row, col, item);
+
+        count++;
+    }
+
+
     QHttpPart filePart;
     filePart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"matrix_file\"; filename=\"" + uploadFile->fileName() + "\""));
     filePart.setBodyDevice(uploadFile);  // Указываем файл как источник данных

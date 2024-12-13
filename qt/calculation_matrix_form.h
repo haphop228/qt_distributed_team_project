@@ -39,8 +39,10 @@ signals:
     void loadingFinished();
 
 private slots:
+
     void on_inverse_button_clicked();
     void on_decompositions_button_clicked();
+
     void on_add_and_upload_file_button_clicked(); // Новый слот для объединенной кнопки
 
     void longRunningOperation();
