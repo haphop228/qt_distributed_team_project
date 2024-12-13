@@ -2,3 +2,5 @@ fastapi
 uvicorn
 httpx
 numpy
+psutil
+asyncio

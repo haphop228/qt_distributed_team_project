@@ -8,9 +8,14 @@ from typing import List
 import numpy as np
 from logger import log  # Используем кастомный логгер
 import time
+import psutil  # Для мониторинга загрузки ресурсов
+import asyncio
 
 WORKER_NODE_CONTROL_SERVER_URL = os.getenv("WORKER_NODE_CONTROL_SERVER_URL")
 app = FastAPI()
+
+# Флаг для отслеживания выполнения задачи
+processing_task = asyncio.Lock()
 
 # Модель данных для входного JSON
 class DecompositionRequest(BaseModel):
@@ -25,6 +30,7 @@ def lu_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Квадратная матрица.
     :return: Список из двух матриц [L, U], где L - нижняя треугольная, U - верхняя треугольная.
     """
+    
     n = matrix.shape[0]
     L = np.zeros((n, n))
     U = np.zeros((n, n))
@@ -51,6 +57,7 @@ def qr_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Прямоугольная матрица.
     :return: Список из двух матриц [Q, R], где Q - ортогональная, R - верхняя треугольная.
     """
+    time.sleep(1)
     m, n = matrix.shape
     Q = np.zeros((m, m))  # Ортогональная матрица
     R = np.zeros((m, n))  # Верхняя треугольная матрица
@@ -103,55 +110,53 @@ def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
 # Маршрут для обработки запросов
 @app.post("/process_task")
 async def process_task(request: DecompositionRequest):
-    """
-    'input_matrix': [ [ 1,2 ] , [3, 4] ],\n
-    'algorithm': 'lu',\n
-    'result': [ [ [ 3, 1] , [ 3, 3] ] , [ [1,2],[3,2] ] ]\n
-    'time_taken": 3.123\n
-    """
-    input_matrix = request.input_matrix
-    algorithm = request.algorithm.lower()
+    global processing_task
 
-    # Преобразование матрицы в формат numpy
-    try:
-        matrix = np.array(input_matrix)
-        if matrix.shape[0] != matrix.shape[1]:
-            raise ValueError("Matrix must be square.")
-    except Exception as e:
-        log(f"Error processing input matrix: {e}", level="error")
-        raise HTTPException(status_code=400, detail=f"Invalid input matrix: {e}")
+    # Установка флага начала обработки
+    async with processing_task:
+        input_matrix = request.input_matrix
+        algorithm = request.algorithm.lower()
 
-    # Выбор функции разложения
-    decomposition_func = {
-        "lu": lu_decomposition,
-        "qr": qr_decomposition,
-        "ldl": ldl_decomposition
-    }.get(algorithm)
+        # Преобразование матрицы в формат numpy
+        try:
+            matrix = np.array(input_matrix)
+            if matrix.shape[0] != matrix.shape[1]:
+                raise ValueError("Matrix must be square.")
+        except Exception as e:
+            log(f"Error processing input matrix: {e}", level="error")
+            raise HTTPException(status_code=400, detail=f"Invalid input matrix: {e}")
 
-    if decomposition_func is None:
-        log(f"Unsupported algorithm: {algorithm}", level="error")
-        raise HTTPException(status_code=400, detail=f"Unsupported algorithm: {algorithm}")
+        # Выбор функции разложения
+        decomposition_func = {
+            "lu": lu_decomposition,
+            "qr": qr_decomposition,
+            "ldl": ldl_decomposition
+        }.get(algorithm)
 
-    # Выполнение разложения с измерением времени
-    try:
-        log(f"Starting {algorithm.upper()} decomposition.")
-        start_time = time.time()
-        result = decomposition_func(matrix)
-        end_time = time.time()
-        time_taken = end_time - start_time
-        log(f"{algorithm.upper()} decomposition completed in {time_taken:.3f} seconds.", level="info")
-    except Exception as e:
-        log(f"Error during {algorithm.upper()} decomposition: {e}", level="error")
-        raise HTTPException(status_code=500, detail=f"Error during decomposition: {e}")
+        if decomposition_func is None:
+            log(f"Unsupported algorithm: {algorithm}", level="error")
+            raise HTTPException(status_code=400, detail=f"Unsupported algorithm: {algorithm}")
 
-    # Формирование ответа
-    response = {
-        "input_matrix": input_matrix,
-        "algorithm": algorithm,
-        "result": [block.tolist() for block in result],
-        "time_taken": round(time_taken, 3)
-    }
-    return response
+        # Выполнение разложения с измерением времени
+        try:
+            log(f"Starting {algorithm.upper()} decomposition.")
+            start_time = time.time()
+            result = decomposition_func(matrix)
+            end_time = time.time()
+            time_taken = end_time - start_time
+            log(f"{algorithm.upper()} decomposition completed in {time_taken:.3f} seconds.", level="info")
+        except Exception as e:
+            log(f"Error during {algorithm.upper()} decomposition: {e}", level="error")
+            raise HTTPException(status_code=500, detail=f"Error during decomposition: {e}")
+
+        # Формирование ответа
+        response = {
+            "input_matrix": input_matrix,
+            "algorithm": algorithm,
+            "result": [block.tolist() for block in result],
+            "time_taken": round(time_taken, 3)
+        }
+        return response
 
 
 # Function to check server availability
@@ -172,8 +177,28 @@ async def check_server_availability(url: str):
     
 @app.get("/status")
 async def get_status():
-    log("Service status checked.")
-    return {
-        "status": "running",
-        "WORKER_CONTROL_URL": WORKER_NODE_CONTROL_SERVER_URL
-    }
+    """
+    Возвращает состояние сервиса, включая загруженность CPU, использование памяти и статус.
+    """
+    try:
+        # Получение данных о CPU и памяти
+        cpu_usage = psutil.cpu_percent(interval=0.1)  # Загрузка CPU в процентах
+        memory_info = psutil.virtual_memory()  # Информация о памяти
+        memory_usage = memory_info.percent  # Использование памяти в процентах
+        # Проверка выполнения задачи
+        is_running = processing_task.locked()
+        
+        # Формирование ответа
+        status_info = {
+            "is_running": is_running,
+            "WORKER_CONTROL_URL": WORKER_NODE_CONTROL_SERVER_URL,
+            "load": {
+                "cpu": cpu_usage,
+                "memory": memory_usage
+            }
+        }
+        log(f"Status check: {status_info}")
+        return status_info
+    except Exception as e:
+        log(f"Error retrieving status: {e}", level="error")
+        raise HTTPException(status_code=500, detail=f"Error retrieving status: {e}")
