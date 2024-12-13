@@ -1,0 +1,12 @@
+# mongo-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongo-pv
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: "C:/Users/User/projects_c++/qt_distributed_team_project/docker_servers/db_mongo"  # Укажите путь на хосте

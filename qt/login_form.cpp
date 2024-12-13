@@ -7,6 +7,14 @@
 #include <QLabel>
 #include <iostream>
 
+
+
+// Используйте эту строку, если поднимаете с помощью docker compose
+// main server http://localhost:8002
+
+// Если вы поднимаете кластер с помощью Minikube, то пропишите в терминале "minikube ip" и вставьте "http://<minikube ip>:30001"
+const QString MAIN_SERVER_URL("http://172.27.181.239:30001");
+
 login_form::login_form(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::login_form)
@@ -22,10 +30,70 @@ void login_form::on_login_clicked()
     QByteArray passwordHash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256);
     QString hashedPassword = passwordHash.toHex();
 
-    QMessageBox::information(this, "Успех", "Вход выполнен успешно!");
-    calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form();
-    calculation_matrix_form->show();
-    this->hide(); // Скрываем окно входа
+    // Сохраняем логин пользователя для дальнейших операций
+    m_userlogin = userlogin;
+
+    // Создаем JSON-объект для отправки на сервер
+    QJsonObject json;
+    json["login"] = userlogin;
+    json["password"] = hashedPassword;
+    // Хешируем пароль перед отправкой
+
+    // Преобразуем JSON-объект в строку
+    QJsonDocument jsonDoc(json);
+    QByteArray jsonData = jsonDoc.toJson();
+
+    // Создаем экземпляр QNetworkAccessManager
+    QNetworkAccessManager *manager = new QNetworkAccessManager(this);
+
+    // Устанавливаем URL для запроса
+    QUrl url(MAIN_SERVER_URL + "/login");
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // Отправляем POST-запрос
+    QNetworkReply *reply = manager->post(request, jsonData);
+
+    // Подключаем слот для обработки ответа от сервера
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            // Успешно получили ответ
+            QByteArray response_data = reply->readAll();
+            qDebug() << "Response from server: " << response_data;
+
+            // Если сервер вернул успешный ответ, показываем главное окно
+            QMessageBox::information(this, "Успех", "Вход выполнен успешно!");
+            calculation_matrix_form *calculation_matrix_form = new class calculation_matrix_form(m_userlogin);
+            calculation_matrix_form->show();
+            this->close(); // Скрываем окно входа
+        }
+        else {
+            // Ошибка при запросе
+            QByteArray response_data = reply->readAll();  // Чтение тела ответа
+            qDebug() << "Error response from server: " << response_data;
+
+            // Попытаемся распарсить JSON, который сервер отправляет в ответе
+            QJsonDocument jsonDoc = QJsonDocument::fromJson(response_data);
+            QJsonObject jsonObj = jsonDoc.object();
+
+            // Проверяем наличие поля "detail" в JSON (именно там сервер отправляет сообщение об ошибке)
+            if (jsonObj.contains("detail")) {
+                QString errorDetail = jsonObj["detail"].toString();
+
+                if (errorDetail == "User with this email already exists") {
+                    QMessageBox::warning(this, "Login Error", "Failed to Login. Wrong password or login.");
+                }
+                else {
+                    QMessageBox::warning(this, "Login Error", "Failed to login: " + errorDetail);
+                }
+
+            } else {
+                // Если в ответе нет детального описания ошибки
+                QMessageBox::warning(this, "Login Error", "Failed to login. Unknown error.");
+            }
+        }
+        reply->deleteLater();  // Удаляем reply после обработки
+    });
 }
 
 
