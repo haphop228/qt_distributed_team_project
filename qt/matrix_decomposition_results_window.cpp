@@ -43,18 +43,18 @@ void matrix_decomposition_results_window::setResults(const QJsonObject &results,
     timeLabel->setText("Время выполнения: " + QString::number(timeTaken, 'f', 6) + " сек");
 
     // Проверяем наличие ключа "result"
-    if (!results.contains("result")) {
-        qDebug() << "Ключ 'result' отсутствует!";
+    if (!results.contains("blocks")) {
+        qDebug() << "Ключ 'blocks' отсутствует!";
         return;
     }
 
-    QJsonArray resultArray = results["result"].toArray();
+    QJsonArray resultArray = results["blocks"].toArray();
     if (resultArray.isEmpty()) {
-        qDebug() << "Массив 'result' пуст!";
+        qDebug() << "Массив 'blocks' пуст!";
         return;
     }
 
-    qDebug() << "Массив 'result': " << resultArray;
+    qDebug() << "Массив 'blocks': " << resultArray;
 
     // В зависимости от типа разложения выводим соответствующие матрицы
     if (selectedKey.toLower() == "lu") {
@@ -70,7 +70,7 @@ void matrix_decomposition_results_window::setResults(const QJsonObject &results,
 
 void matrix_decomposition_results_window::addMatrixTextOutput(const QJsonArray &matrixData, const QString &title)
 {
-    qDebug() << "matrix_data: " <<  matrixData << '\n\n';
+    qDebug() << "matrix_data: " <<  matrixData << '\n';
     if (matrixData.isEmpty()) {
         qDebug() << "Матрица для отображения пуста!";
         return;
