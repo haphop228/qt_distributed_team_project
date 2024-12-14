@@ -63,6 +63,10 @@ void matrix_decomposition_results_window::setResults(const QJsonObject &results,
     } else if (selectedKey.toLower() == "qr") {
         addMatrixTextOutput(resultArray.at(0).toArray(), "Матрица Q");
         addMatrixTextOutput(resultArray.at(1).toArray(), "Матрица R");
+    } else if (selectedKey.toLower() == "ldl") {
+        addMatrixTextOutput(resultArray.at(0).toArray(), "Матрица L");
+        addMatrixTextOutput(resultArray.at(1).toArray(), "Матрица D");
+        addMatrixTextOutput(resultArray.at(2).toArray(), "Матрица L.T");
     } else {
         qDebug() << "Неизвестный тип разложения: " << selectedKey;
     }
