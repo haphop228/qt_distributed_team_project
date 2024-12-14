@@ -11,7 +11,7 @@ docker run -d --name fastapi-matrix-container -p 8000:8000 fastapi-matrix-decomp
 # 3. Подождать, чтобы сервер успел запуститься
 echo "Waiting for the server to start..."
 sleep 2
-
+echo "Started."
 # # 4. Отправить большую задачу на сервер (тяжелая матрица)
 # echo "Sending a heavy task to the server..."
 # {
@@ -24,6 +24,8 @@ sleep 2
 #   }' &
 # } > /dev/null &
 
+
+
 # Тестирование другого разложения (например QR)
 curl -s  -X 'POST' \
 'http://127.0.0.1:8000/process_task' \
@@ -34,32 +36,55 @@ curl -s  -X 'POST' \
 "algorithm": "qr"
 }'
 
+echo -e "\n"
+
 # 5. Подождать 0.2 секунду, чтобы убедиться, что задача выполняется
 echo "Waiting for the task to process..."
-sleep 0.5
-echo "Started."
+sleep 1
+
 
 # 6. Отправить запрос на /status во время выполнения задачи
 echo "Checking server status during the task execution..."
 curl -s  -X 'GET' \
 'http://127.0.0.1:8000/status'
 
-sleep 1
+echo -e "\n"
+
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
+
+echo -e "\n"
+
+sleep 2
 
 # 6. Отправить запрос на /status во время выполнения задачи
 echo "Checking server status during the task execution..."
 curl -s -X 'GET' \
 'http://127.0.0.1:8000/status'
 
-sleep 3
+echo -e "\n"
+
+sleep 4
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
 
 # 6. Отправить запрос на /status во время выполнения задачи
 echo "Checking server status during the task execution..."
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
+
+echo -e "\n"
+
 curl -s -X 'GET' \
 'http://127.0.0.1:8000/status'
 
-# 7. Ожидание завершения фоновой задачи
-wait
+
+
+
+
 
 
 # # 5. Остановить и удалить Docker контейнер

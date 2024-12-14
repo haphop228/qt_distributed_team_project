@@ -204,7 +204,7 @@ async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: in
                 # Сортировка свободных узлов по нагрузке
                 free_workers.sort(key=lambda x: (x[2]["load"].get("cpu", float('inf')), x[2]["load"].get("memory", float('inf'))))
                 # TODO : пофиксить статус реквест на worker node
-                selected_worker = random.choice(free_workers)
+                selected_worker = free_workers[0] #random.choice(free_workers)
                 worker_name, worker_url, _ = selected_worker
 
                 # Отправка задачи на выбранный узел
@@ -215,19 +215,45 @@ async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: in
                     }
                     log(f"sending data: \n\n{data_to_send} \n\n")
                     log(f"Sending task to {worker_name} at {worker_url}.", level="info")
-                    
+
+                    # Отправка задачи
                     response = await client.post(f"{worker_url}/process_task", json=data_to_send)
 
                     if response.status_code == 200:
                         log(f"Task successfully sent to {worker_name}. Response: {response.json()}", level="info")
-                        return response.json()
                     else:
                         log(f"Failed to process task on {worker_name}. HTTP {response.status_code}: {response.text}", level="error")
                         raise HTTPException(status_code=503, detail=f"Task failed on {worker_name}. HTTP {response.status_code}")
                 except Exception as e:
-                    # TODO : bugfix
                     log(f"Error sending task to {worker_name}: {e}", level="error")
                     raise HTTPException(status_code=503, detail=f"Error sending task to {worker_name}: {e}")
+
+                # Ожидание результата от сервера
+                log(f"Waiting for result from {worker_name}...")
+                result = None
+                max_retries = 30  # Максимальное количество попыток
+                retry_interval = 0.5  # Интервал между попытками (в секундах)
+
+                for attempt in range(max_retries):
+                    try:
+                        # Опрос статуса выполнения задачи
+                        status_response = await client.get(f"{worker_url}/get_result")
+                        if status_response.status_code == 200:
+                            result = status_response.json()
+                            log(f"Received result from {worker_name}: {result}", level="info")
+                            break
+                        else:
+                            log(f"Status check failed on {worker_name}. HTTP {status_response.status_code}: {status_response.text}")
+                    except Exception as e:
+                        log(f"Error checking status on {worker_name}: {e}", level="error")
+                    
+                    await asyncio.sleep(retry_interval)
+
+                if result is None:
+                    log(f"Failed to get result from {worker_name} after {max_retries} retries.", level="error")
+                    raise HTTPException(status_code=504, detail=f"Failed to get result from {worker_name}.")
+
+                return result
 
             # Если все узлы заняты, ждем перед повторной попыткой
             log(f"All workers are busy. Retrying in {retry_delay} seconds...", level="warning")
