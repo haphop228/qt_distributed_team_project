@@ -16,13 +16,13 @@
 #include <QFileDialog>
 #include "loading.h"
 #include <QThread>
-#include <QFileDialog>
 #include <QHttpMultiPart>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QMessageBox>
 #include <QtCore/qjsondocument.h>
 #include <QJsonArray>
+
 
 namespace Ui {
 class calculation_matrix_form;
@@ -40,9 +40,12 @@ signals:
     void loadingFinished();
 
 private slots:
-    void on_add_file_button_clicked();
-    void on_decomposite_button_clicked();
-    void on_load_file_to_server_button();
+
+    void on_inverse_button_clicked();
+    void on_decompositions_button_clicked();
+
+    void on_add_and_upload_file_button_clicked(); // Новый слот для объединенной кнопки
+
     void longRunningOperation();
 
 private:
@@ -51,9 +54,9 @@ private:
 
     QString m_userlogin;
 
-    QPushButton *add_file_button;
-    QPushButton *decomposite_button;
-    QPushButton *load_file_to_server_button;
+    QPushButton *add_and_upload_file_button; // Новая кнопка
+    QPushButton *inverse_button;
+    QPushButton *decompositions_button;
 
     QLineEdit *file_path_line_edit;
 

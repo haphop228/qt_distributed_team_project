@@ -14,9 +14,9 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Network)
 
 set(PROJECT_SOURCES
         main.cpp
-        mainwindow.cpp
-        mainwindow.h
-        mainwindow.ui
+
+
+
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -29,6 +29,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
 
         loading.h loading.cpp
         download_files_form.h download_files_form.cpp download_files_form.ui
+        matrix_decomposition_results_window.h matrix_decomposition_results_window.cpp matrix_decomposition_results_window.ui
+        operation_selection_dialog.h operation_selection_dialog.cpp
 
 
     )
