@@ -8,6 +8,7 @@ from scipy.io import mmread, mmwrite
 from io import BytesIO
 from pydantic import BaseModel
 from logger import log  # Используем кастомный логгер
+import random
 
 app = FastAPI()
 TEMP_DIR = "temp_mtx_files"
@@ -202,7 +203,8 @@ async def send_task_to_worker_node(matrix: np.array, algorithm: str, retries: in
             if free_workers:
                 # Сортировка свободных узлов по нагрузке
                 free_workers.sort(key=lambda x: (x[2]["load"].get("cpu", float('inf')), x[2]["load"].get("memory", float('inf'))))
-                selected_worker = free_workers[0]
+                # TODO : пофиксить статус реквест на worker node
+                selected_worker = random.choice(free_workers)
                 worker_name, worker_url, _ = selected_worker
 
                 # Отправка задачи на выбранный узел

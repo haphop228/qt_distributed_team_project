@@ -30,7 +30,7 @@ def lu_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Квадратная матрица.
     :return: Список из двух матриц [L, U], где L - нижняя треугольная, U - верхняя треугольная.
     """
-    time.sleep(4)
+    time.sleep(0.1)
     n = matrix.shape[0]
     L = np.zeros((n, n))
     U = np.zeros((n, n))
@@ -57,7 +57,7 @@ def qr_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Прямоугольная матрица.
     :return: Список из двух матриц [Q, R], где Q - ортогональная, R - верхняя треугольная.
     """
-    time.sleep(4)
+    time.sleep(0.1)
     m, n = matrix.shape
     Q = np.zeros((m, m))  # Ортогональная матрица
     R = np.zeros((m, n))  # Верхняя треугольная матрица
@@ -88,7 +88,7 @@ def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Симметричная положительно определённая матрица.
     :return: Список из двух матриц [L, D], где L - нижняя треугольная с единицами на диагонали, D - диагональная.
     """
-    time.sleep(4)
+    time.sleep(0.1)
     if not np.allclose(matrix, matrix.T):
         raise ValueError("Matrix must be symmetric for LDL decomposition.")
 
