@@ -268,7 +268,8 @@ void calculation_matrix_form::on_decompositions_button_clicked() {
     connect(dialog, &OperationSelectionDialog::operationSelected, this, [this, matrixName](const QString &operation) {
         QString endpoint;
         if (operation == "inverse") {
-            endpoint = "/calculate_invertible_matrix_by_matrix_name";
+            on_inverse_button_clicked();
+            return;
         } else {
             endpoint = "/calculate_decomposition_of_matrix_by_matrix_name";
         }
