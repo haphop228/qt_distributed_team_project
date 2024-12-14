@@ -5,7 +5,7 @@ DOCKER_USERNAME="alice3e"
 IMAGE_TAG="latest"
 
 # Массив с именами сервисов
-SERVERS=("main_server" "mongo_app" "sqlite_app" "worker_node_control_server", "worker_node")
+SERVERS=("main_server" "mongo_app" "sqlite_app" "worker_node_control_server" "worker_node")
 
 
 # Проверяем, включён ли buildx

@@ -1,16 +1,28 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import httpx
+import threading
 import os
+import queue
 from typing import List
 import numpy as np
 from logger import log  # Используем кастомный логгер
 import time
+import psutil  # Для мониторинга загрузки ресурсов
+import asyncio
 
 WORKER_NODE_CONTROL_SERVER_URL = os.getenv("WORKER_NODE_CONTROL_SERVER_URL")
 app = FastAPI()
+
+# Используем для управления состоянием задачи
+processing_task_active = False
+task_lock = threading.Lock()  # Для потокобезопасного доступа к переменной
+# Очередь для хранения результата
+result_queue = queue.Queue()
+
+algorithm_gl = ''
+matrix_name_gl = ''
+time_taken_gl = 0
 
 # Модель данных для входного JSON
 class DecompositionRequest(BaseModel):
@@ -25,6 +37,9 @@ def lu_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Квадратная матрица.
     :return: Список из двух матриц [L, U], где L - нижняя треугольная, U - верхняя треугольная.
     """
+    global processing_task_active, time_taken_gl
+    start = time.time()
+    time.sleep(0.1)
     n = matrix.shape[0]
     L = np.zeros((n, n))
     U = np.zeros((n, n))
@@ -41,7 +56,12 @@ def lu_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
             else:
                 L[j, i] = (matrix[j, i] - sum(L[j, k] * U[k, i] for k in range(i))) / U[i, i]
     
-    return [L, U]
+    with task_lock:
+        processing_task_active = False
+    end = time.time()
+    time_taken_gl = (end - start)
+    result_queue.put([L, U])
+    
 
 
 def qr_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
@@ -51,6 +71,10 @@ def qr_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Прямоугольная матрица.
     :return: Список из двух матриц [Q, R], где Q - ортогональная, R - верхняя треугольная.
     """
+    log(f"QR decompos function started!")
+    global processing_task_active, time_taken_gl
+    start = time.time()
+    time.sleep(6)
     m, n = matrix.shape
     Q = np.zeros((m, m))  # Ортогональная матрица
     R = np.zeros((m, n))  # Верхняя треугольная матрица
@@ -70,8 +94,14 @@ def qr_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
         # Обновляем матрицу A, вычитая проекцию
         for j in range(i + 1, n):
             A[:, j] -= Q[:, i] * R[i, j]
+            
+    with task_lock:
+        processing_task_active = False
+        
+    end = time.time()
+    time_taken_gl = (end - start)
+    result_queue.put([Q[:, :n], R[:n, :]])
     
-    return [Q[:, :n], R[:n, :]]
 
 
 def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
@@ -81,6 +111,9 @@ def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
     :param matrix: Симметричная положительно определённая матрица.
     :return: Список из двух матриц [L, D], где L - нижняя треугольная с единицами на диагонали, D - диагональная.
     """
+    global processing_task_active, time_taken_gl
+    start = time.time()
+    time.sleep(0.1)
     if not np.allclose(matrix, matrix.T):
         raise ValueError("Matrix must be symmetric for LDL decomposition.")
 
@@ -97,20 +130,39 @@ def ldl_decomposition(matrix: np.ndarray) -> List[np.ndarray]:
             L[j, i] = (matrix[j, i] - sum(L[j, k] * L[i, k] * D[k] for k in range(i))) / D[i]
 
     D_matrix = np.diag(D)  # Преобразуем в диагональную матрицу для удобства
-    return [L, D_matrix, L.T]
+    
+    with task_lock:
+        processing_task_active = False
+        
+    end = time.time()
+    time_taken_gl = (end - start)
+    result_queue.put([L, D_matrix, L.T])
+
 
 
 # Маршрут для обработки запросов
 @app.post("/process_task")
 async def process_task(request: DecompositionRequest):
-    """
-    'input_matrix': [ [ 1,2 ] , [3, 4] ],\n
-    'algorithm': 'lu',\n
-    'result': [ [ [ 3, 1] , [ 3, 3] ] , [ [1,2],[3,2] ] ]\n
-    'time_taken": 3.123\n
-    """
+    
+    # Очистка очереди перед запуском новой задачи
+    while not result_queue.empty():
+        result_queue.get()
+    
+    # # Установка флага начала обработки
+    global processing_task_active, matrix_name_gl, algorithm_gl
+    
+    with task_lock:
+        if processing_task_active:
+            raise HTTPException(status_code=400, detail="Task is already running.")
+        log(f"makin processing_task_active = True from process_task")
+        processing_task_active = True
+    
+    log(f"Starting to process... {processing_task_active}")
+    
     input_matrix = request.input_matrix
     algorithm = request.algorithm.lower()
+    algorithm_gl = algorithm
+    matrix_name_gl = input_matrix
 
     # Преобразование матрицы в формат numpy
     try:
@@ -118,6 +170,7 @@ async def process_task(request: DecompositionRequest):
         if matrix.shape[0] != matrix.shape[1]:
             raise ValueError("Matrix must be square.")
     except Exception as e:
+        processing_task_active = False
         log(f"Error processing input matrix: {e}", level="error")
         raise HTTPException(status_code=400, detail=f"Invalid input matrix: {e}")
 
@@ -129,51 +182,77 @@ async def process_task(request: DecompositionRequest):
     }.get(algorithm)
 
     if decomposition_func is None:
+        processing_task_active = False
         log(f"Unsupported algorithm: {algorithm}", level="error")
         raise HTTPException(status_code=400, detail=f"Unsupported algorithm: {algorithm}")
 
     # Выполнение разложения с измерением времени
     try:
-        log(f"Starting {algorithm.upper()} decomposition.")
-        start_time = time.time()
-        result = decomposition_func(matrix)
-        end_time = time.time()
-        time_taken = end_time - start_time
-        log(f"{algorithm.upper()} decomposition completed in {time_taken:.3f} seconds.", level="info")
+        log(f"Starting {algorithm.upper()} decomposition in a separate thread.")
+        # TODO : что бы я не делал, эта задача полностью перекрывает любые запросы к серверу
+        # Запуск задачи в отдельном потоке
+        thread = threading.Thread(target=decomposition_func,args=(matrix,), daemon=True)
+        thread.start()
     except Exception as e:
+        processing_task_active = False
         log(f"Error during {algorithm.upper()} decomposition: {e}", level="error")
         raise HTTPException(status_code=500, detail=f"Error during decomposition: {e}")
 
-    # Формирование ответа
+    return {"message": "Task started"}
+
+
+@app.get("/get_result")
+def get_result():
+    """
+    Возвращает результат выполнения задачи, если он доступен.
+    """
+    global processing_task_active, matrix_name_gl, algorithm_gl, time_taken_gl
+    
+    if result_queue.empty() or processing_task_active == True:
+        raise HTTPException(status_code=404, detail=f"Result not ready yet - {result_queue.empty() , processing_task_active}")
+
+    # Извлекаем результат из очереди
+    result = result_queue.get()
+
+        # Формирование ответа
     response = {
-        "input_matrix": input_matrix,
-        "algorithm": algorithm,
+        "input_matrix": matrix_name_gl,
+        "algorithm": algorithm_gl,
         "result": [block.tolist() for block in result],
-        "time_taken": round(time_taken, 3)
+        "time_taken": round(time_taken_gl, 3)
     }
+
+    log(f"Task ended...{processing_task_active}")
+    processing_task_active = False
     return response
 
 
-# Function to check server availability
-async def check_server_availability(url: str):
-    try:
-        async with httpx.AsyncClient() as client:
-            log(f"Checking server availability for URL: {url}")
-            response = await client.get(url)
-            if response.status_code == 200:
-                log(f"Server {url} is available.")
-                return True
-            else:
-                log(f"Server {url} responded with status code {response.status_code}.")
-                return False
-    except httpx.RequestError as e:
-        log(f"Failed to check server availability for {url}: {e}", level="error")
-        return False
-    
 @app.get("/status")
 async def get_status():
-    log("Service status checked.")
-    return {
-        "status": "running",
-        "WORKER_CONTROL_URL": WORKER_NODE_CONTROL_SERVER_URL
-    }
+    """
+    Возвращает состояние сервиса, включая загруженность CPU, использование памяти и статус.
+    """
+    global processing_task_active
+    try:
+        with task_lock:
+            # Получение данных о CPU и памяти
+            cpu_usage = psutil.cpu_percent(interval=0.1)  # Загрузка CPU в процентах
+            memory_info = psutil.virtual_memory()  # Информация о памяти
+            memory_usage = memory_info.percent  # Использование памяти в процентах
+            # Проверка выполнения задачи
+            is_running = processing_task_active
+            
+            # Формирование ответа
+            status_info = {
+                "is_running": is_running,
+                "WORKER_CONTROL_URL": WORKER_NODE_CONTROL_SERVER_URL,
+                "load": {
+                    "cpu": cpu_usage,
+                    "memory": memory_usage
+                }
+            }
+            log(f"Status check: {status_info}")
+            return status_info
+    except Exception as e:
+        log(f"Error retrieving status: {e}", level="error")
+        raise HTTPException(status_code=500, detail=f"Error retrieving status: {e}")
