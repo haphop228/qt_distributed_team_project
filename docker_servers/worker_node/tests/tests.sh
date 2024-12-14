@@ -10,29 +10,81 @@ docker run -d --name fastapi-matrix-container -p 8000:8000 fastapi-matrix-decomp
 
 # 3. Подождать, чтобы сервер успел запуститься
 echo "Waiting for the server to start..."
-sleep 5
+sleep 2
+echo "Started."
+# # 4. Отправить большую задачу на сервер (тяжелая матрица)
+# echo "Sending a heavy task to the server..."
+# {
+#   curl -s -X 'POST' \
+#   'http://127.0.0.1:8000/process_task' \
+#   -H 'Content-Type: application/json' \
+#   -d '{
+#     "input_matrix": '$(python3 -c "import numpy as np; print(np.random.randint(1, 100, (10, 10)).tolist())")',
+#     "algorithm": "lu"
+#   }' &
+# } > /dev/null &
 
-# 4. Выполнить тесты с использованием curl (можно использовать httpx или pytest, но curl для простоты)
-echo "Running tests..."
-
-# Пример теста на разложение LU
-curl -s -X 'POST' \
-'http://127.0.0.1:8000/decompose_matrix' \
--H 'Content-Type: application/json' \
--d '{
-"input_matrix": [[4, 3], [6, 3]],
-"algorithm": "lu"
-}'
 
 
 # Тестирование другого разложения (например QR)
-curl -s -X 'POST' \
-'http://127.0.0.1:8000/decompose_matrix' \
+curl -s  -X 'POST' \
+'http://127.0.0.1:8000/process_task' \
 -H 'Content-Type: application/json' \
 -d '{
-"input_matrix": [[12, -51, 4], [6, 167, -68], [-4, 24, -41]],
+"input_matrix": [[ 1,2 ], [3, 4]]
+,
 "algorithm": "qr"
 }'
+
+echo -e "\n"
+
+# 5. Подождать 0.2 секунду, чтобы убедиться, что задача выполняется
+echo "Waiting for the task to process..."
+sleep 1
+
+
+# 6. Отправить запрос на /status во время выполнения задачи
+echo "Checking server status during the task execution..."
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/status'
+
+echo -e "\n"
+
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
+
+echo -e "\n"
+
+sleep 2
+
+# 6. Отправить запрос на /status во время выполнения задачи
+echo "Checking server status during the task execution..."
+curl -s -X 'GET' \
+'http://127.0.0.1:8000/status'
+
+echo -e "\n"
+
+sleep 4
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
+
+# 6. Отправить запрос на /status во время выполнения задачи
+echo "Checking server status during the task execution..."
+
+curl -s  -X 'GET' \
+'http://127.0.0.1:8000/get_result' 
+
+echo -e "\n"
+
+curl -s -X 'GET' \
+'http://127.0.0.1:8000/status'
+
+
+
+
+
 
 
 # # 5. Остановить и удалить Docker контейнер
