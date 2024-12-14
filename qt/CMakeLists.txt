@@ -27,7 +27,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         registration_form.h registration_form.cpp registration_form.ui
         calculation_matrix_form.h calculation_matrix_form.cpp calculation_matrix_form.ui
 
-        loading.h loading.cpp
+
         download_files_form.h download_files_form.cpp download_files_form.ui
         matrix_decomposition_results_window.h matrix_decomposition_results_window.cpp matrix_decomposition_results_window.ui
         operation_selection_dialog.h operation_selection_dialog.cpp
