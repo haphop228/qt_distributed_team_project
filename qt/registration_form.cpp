@@ -5,7 +5,7 @@
 // main server http://localhost:8002
 
 // Если вы поднимаете кластер с помощью Minikube, то пропишите в терминале "minikube ip" и вставьте "http://<minikube ip>:30001"
-const QString MAIN_SERVER_URL("http://172.27.181.239:30001");
+const QString MAIN_SERVER_URL("http://localhost:8002");
 
 registration_form::registration_form(QWidget *parent) :
     QDialog(parent),
