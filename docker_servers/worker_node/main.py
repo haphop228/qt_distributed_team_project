@@ -189,7 +189,6 @@ async def process_task(request: DecompositionRequest):
     # Выполнение разложения с измерением времени
     try:
         log(f"Starting {algorithm.upper()} decomposition in a separate thread.")
-        # TODO : что бы я не делал, эта задача полностью перекрывает любые запросы к серверу
         # Запуск задачи в отдельном потоке
         thread = threading.Thread(target=decomposition_func,args=(matrix,), daemon=True)
         thread.start()
