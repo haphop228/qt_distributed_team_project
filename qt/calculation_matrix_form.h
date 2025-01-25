@@ -14,7 +14,6 @@
 #include <QWidget>
 #include <QMainWindow>
 #include <QFileDialog>
-#include "loading.h"
 #include <QThread>
 #include <QHttpMultiPart>
 #include <QNetworkAccessManager>
@@ -65,7 +64,6 @@ private:
 
     QTableWidget *matrix_viewer;
 
-    Loading *loadingDialog;
 };
 
 #endif // CALCULATION_MATRIX_FORM_H

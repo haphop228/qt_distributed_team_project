@@ -194,13 +194,13 @@ volumes:
     driver: local
     driver_opts:
       type: none
-      device: "/Users/stepanudincev/_it/spbu/kmms_prog_2024/qt_distributed_team_project/docker_servers/db_mongo"  # Укажите путь на хосте для MongoDB
+      device: "/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_mongo"  # Укажите путь на хосте для MongoDB
       o: bind
   sqlite_data:
     driver: local
     driver_opts:
       type: none
-      device: "/Users/stepanudincev/_it/spbu/kmms_prog_2024/qt_distributed_team_project/docker_servers/db_sqlite"  # Укажите путь на хосте для SQLite
+      device: "/Users/alicee/Desktop/Work_Main/qt_distributed_team_project/docker_servers/db_sqlite"  # Укажите путь на хосте для SQLite
       o: bind
 networks:
   app-network:
